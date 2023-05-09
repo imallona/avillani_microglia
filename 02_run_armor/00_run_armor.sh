@@ -1,8 +1,9 @@
 #!/bin/bash
 ##
+## Runs ARMOR on in-house and public data
 ##
 ## 9th May 2023
-
+## Izaskun Mallona
 
 WD=~/avillani_microglia
 
@@ -13,7 +14,7 @@ git clone https://github.com/csoneson/ARMOR.git
 mv ARMOR/config.yaml{,.original}
 
 ln -s  ambra_config.yaml ARMOR/config.yaml
-ln -s metadata.tsv ARMOR/
+ln -s metadata.tsv ARMOR/metadata.tsv
 cd ARMOR
 
 mkdir -p ../armor_output
