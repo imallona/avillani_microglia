@@ -162,3 +162,18 @@ do
 
     rm "$srr".sra
 done < mcquade_ipsc.conf
+
+
+# Ambra's data - uncompress/rsync
+
+mkdir ambra
+cd $_
+
+mv ~/ambra_villani_transfer_123461_files_4a03f22e.zip .
+
+unzip *zip
+
+mv *fastq.gz ..
+cd ..
+
+rmdir ambra
