@@ -1,0 +1,150 @@
+---
+title: "A. Villani's microglia RNAseq"
+author: "Izaskun Mallona, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+
+```{r warning = FALSE, message = FALSE}
+## .libPaths('/home/imallona/R/R4_bioc314')
+library(ggplot2)
+## library(EnhancedVolcano)
+## library(iSEE)
+## library(knitr)
+## library(DRIMSeq)
+## library(EnsDb.Hsapiens.v86)
+library(SingleCellExperiment)
+library(corrplot)
+#library(GGally)
+#library(scuttle)
+#library(knitr)
+#library(greybox) # cramer's distance
+#library(viridis)
+#library(regioneR)
+#library(GenomicRanges)
+#library(rtracklayer)
+
+## camera start
+
+## library(dplyr)
+## library(msigdbr)
+## library(CAMERA)
+
+#require(topGO)
+#require(org.Hs.eg.db)
+
+## library("ggVennDiagram")
+library(recount3)
+```
+
+
+
+```{r}
+opts_chunk$set(fig.width = 8,
+               fig.height = 8,
+               cache = TRUE,
+               include = TRUE,
+               fig.path = "plots/",
+               dev = c("png", "svg"),
+               cache.lazy = FALSE,
+               warning = TRUE,
+               message = TRUE,
+               dpi = 500)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+options(bitmapType='cairo')
+```
+
+# Aim
+
+# Data
+
+## Ambra's
+
+```{r}
+d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_sce.rds')$sce_gene
+```
+
+## Abud
+
+
+```{r, message = FALSE, warning = FALSE}
+srp <- "SRP092075"
+abud <- recount3::create_rse_manual(
+                    project = srp,
+                    project_home = "data_sources/sra",
+                    organism = "human",
+                    annotation = "gencode_v29",
+                    type = "gene")
+
+assay(abud, "counts") <- transform_counts(abud)
+
+summary(assay(abud, 'counts'))
+
+```
+
+```{r, eval = FALSE}
+abud <- subset(abud,
+             select = colData(sg)$sra.sample_title %in%
+                                 c('siControl 1', 'siControl 2', 'siControl 3',
+                                   'siTDP-43 1', 'siTDP-43 2', 'siTDP-43 3'))
+metadata <- colData(abud)
+```
+
+## McQuade TREM
+
+```{r}
+
+srp <- 'SRP281230'
+
+trem <- recount3::create_rse_manual(
+                    project = srp,
+                    project_home = "data_sources/sra",
+                    organism = "human",
+                    annotation = "gencode_v29",
+                    type = "gene")
+
+assay(trem, "counts") <- transform_counts(trem)
+
+```
+
+## McQuade
+
+```{r}
+srp <- 'SRP155574'
+
+mc <- recount3::create_rse_manual(
+                    project = srp,
+                    project_home = "data_sources/sra",
+                    organism = "human",
+                    annotation = "gencode_v29",
+                    type = "gene")
+
+assay(mc, "counts") <- transform_counts(mc)
+
+```
+
+
+# Procedure
+
+
+# Timestamp
+
+```{r sessionInfo2, cache = FALSE}
+date()
+sessionInfo()
+devtools::session_info()
+```

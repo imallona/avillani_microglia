@@ -85,20 +85,20 @@ EOF
 
 
 cat << EOF > metadata_ambra_only.tsv
-names${TAB}type${TAB}treatment${TAB}batch${TAB}mutation
-20220209.A-av111_WT_001_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220209.A-av111_WT_002_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220209.A-av111_WT_003_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220209.A-tw029_WT_2_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220209.A-tw029_WT_3_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220504.B-WTC_1_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220504.B-WTC_2_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT
-20220504.B-SLC-EX2B1_1_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_(mut1)${TAB}ambra${TAB}Slc37a2
-20220504.B-SLC-EX2B1_2_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_(mut1)${TAB}ambra${TAB}Slc37a2
-20220504.B-SLC-EX6C5_1_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_(mut2)${TAB}ambra${TAB}Slc37a2
-20220504.B-SLC-EX6C5_2_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_(mut2)${TAB}ambra${TAB}Slc37a2
-20220504.B-TREM2-A1_1_R1${TAB}SE${TAB}iPSC_MG_TREM2_mut${TAB}ambra${TAB}TREM2
-20220504.B-TREM2-A1_2_R1${TAB}SE${TAB}iPSC_MG_TREM2_mut${TAB}ambra${TAB}TREM2
+names${TAB}type${TAB}treatment${TAB}batch${TAB}mutation${TAB}timepoint
+20220209.A-av111_WT_001_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}34
+20220209.A-av111_WT_002_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}34
+20220209.A-av111_WT_003_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}34
+20220209.A-tw029_WT_2_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}38
+20220209.A-tw029_WT_3_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}38
+20220504.B-WTC_1_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}28
+20220504.B-WTC_2_R1${TAB}SE${TAB}iPSC_MG${TAB}ambra${TAB}WT${TAB}28
+20220504.B-SLC-EX2B1_1_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_mut1${TAB}ambra${TAB}Slc37a2${TAB}28
+20220504.B-SLC-EX2B1_2_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_mut1${TAB}ambra${TAB}Slc37a2${TAB}28
+20220504.B-SLC-EX6C5_1_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_mut2${TAB}ambra${TAB}Slc37a2${TAB}28
+20220504.B-SLC-EX6C5_2_R1${TAB}SE${TAB}iPSC_MG_Slc37a2_mut2${TAB}ambra${TAB}Slc37a2${TAB}28
+20220504.B-TREM2-A1_1_R1${TAB}SE${TAB}iPSC_MG_TREM2_mut${TAB}ambra${TAB}TREM2${TAB}28
+20220504.B-TREM2-A1_2_R1${TAB}SE${TAB}iPSC_MG_TREM2_mut${TAB}ambra${TAB}TREM2${TAB}28
 EOF
 
 # these are human
@@ -181,8 +181,8 @@ metatxt: metadata_ambra_only.tsv
 ## of the form "~ <predictors>"
 ## contrast: (comma-separated if multiple) list of contrasts to estimate in edgeR_dge.Rmd
 design: "~ 0 + treatment"
-# contrast: iPSC_MG_Slc37a2_mutant-iPSC_MG,iPSC_MG_TREM2_mut-iPSC_MG,iPSC_MG_Slc37a2_mutant-iPSC_MG_TREM2_mut,iPSC_MG_Slc37a2_mutant-iPSC_MG_TREM2_KO_(McQuade),iPSC_MG_TREM2_mut-iPSC_MG_TREM2_KO_(McQuade),iPSC_MG-iPSC_MG_(Abud),iPSC_MG-iHPC_(Abud),iPSC_MG-CD14_M_(Abud),iPSC_MG-CD14_M_(Abud),iPSC_MG-Fetal_MG_(Abud),iPSC_MG-Adult_MG_(Abud),iPSC_MG-Blood_DC_(Abud)
-contrast: iPSC_MG_Slc37a2_mutant-iPSC_MG,iPSC_MG_TREM2_mut-iPSC_MG,iPSC_MG_Slc37a2_(mut1)-iPSC_MG_TREM2_mut,iPSC_MG_Slc37a2_(mut2)-iPSC_MG_TREM2_mut
+## contrast: iPSC_MG_Slc37a2_mutant-iPSC_MG,iPSC_MG_TREM2_mut-iPSC_MG,iPSC_MG_Slc37a2_mutant-iPSC_MG_TREM2_mut,iPSC_MG_Slc37a2_mutant-iPSC_MG_TREM2_KO_(McQuade),iPSC_MG_TREM2_mut-iPSC_MG_TREM2_KO_(McQuade),iPSC_MG-iPSC_MG_(Abud),iPSC_MG-iHPC_(Abud),iPSC_MG-CD14_M_(Abud),iPSC_MG-CD14_M_(Abud),iPSC_MG-Fetal_MG_(Abud),iPSC_MG-Adult_MG_(Abud),iPSC_MG-Blood_DC_(Abud)
+contrast: treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG,treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG,treatmentiPSC_MG_TREM2_mut-treatmentiPSC_MG,treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG_TREM2_mut,treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_TREM2_mut,treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_Slc37a2_mut1
 ## Gene sets used for gene set analysis with camera
 ## Comma-separated list of gene set categories to test with camera. 
 ## Must be a subset of H,C1,C2,C3,C4,C5,C6,C7
