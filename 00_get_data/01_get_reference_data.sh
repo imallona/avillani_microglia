@@ -14,4 +14,4 @@ wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/GRCh38
 
 wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/gencode.v43.pc_transcripts.fa.gz
 
-
+gunzip *gz
