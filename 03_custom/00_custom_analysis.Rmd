@@ -46,26 +46,35 @@ library(corrplot)
 
 ## library("ggVennDiagram")
 library(recount3)
+
+  library(tibble)
+library(dplyr)
+##  library(tidyr)
+  library(limma)
+  library(edgeR)
+## library(reshape2)
+
+
 ```
 
 
 
 ```{r}
-opts_chunk$set(fig.width = 8,
-               fig.height = 8,
-               cache = TRUE,
-               include = TRUE,
-               fig.path = "plots/",
-               dev = c("png", "svg"),
-               cache.lazy = FALSE,
-               warning = TRUE,
-               message = TRUE,
-               dpi = 500)
+knitr::opts_chunk$set(fig.width = 8,
+                      fig.height = 8,
+                      cache = FALSE,
+                      include = TRUE,
+                      fig.path = "plots/",
+                      dev = c("png"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE,
+                      dpi = 500)
 
 ## plan("multiprocess", workers = NTHREADS)
 ## options(future.globals.maxSize= 1.4e9)
 
-options(bitmapType='cairo')
+## options(bitmapType='cairo')
 ```
 
 # Aim
@@ -77,6 +86,73 @@ options(bitmapType='cairo')
 ```{r}
 d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_sce.rds')$sce_gene
 ```
+
+
+```{r}
+
+logcpms <- assay(d, "logcpm")
+mds <- limma::plotMDS(logcpms, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(logcpms),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+mds <- mds %>% 
+    dplyr::full_join(data.frame(colData(d)), by = "names")
+```
+
+### MDS {.tabset .tabset-pills}
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+for (item in c('treatment', 'timepoint', 'names')) {
+    cat('#### ', item, '\n\n')
+    print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
+          geom_point(size=3) +
+          labs(x="Dimension 1", y="Dimension 2", title= paste("MDS", item)) +
+          coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                          ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+          theme_bw() +
+          coord_fixed() + 
+          theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+    cat('\n\n')
+
+}
+```
+
+### Correlation  {.tabset .tabset-pills}
+
+#### All genes
+
+```{r, fig.width = 10, fig.height = 10}
+corrplot(cor(logcpms, method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
+
+
+```
+
+#### Top 500 most variable genes
+
+```{r, fig.width = 10, fig.height = 10}
+corrplot(cor(logcpms[head(order(rowVars(logcpms), decreasing = TRUE), 500),], method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+         addCoef.col  = 'black', number.cex  =  0.8, order  =  'hclust', diag = TRUE)
+
+
+
+
+```
+
 
 ## Abud
 
@@ -92,7 +168,6 @@ abud <- recount3::create_rse_manual(
 
 assay(abud, "counts") <- transform_counts(abud)
 
-summary(assay(abud, 'counts'))
 
 ```
 
@@ -103,6 +178,92 @@ abud <- subset(abud,
                                    'siTDP-43 1', 'siTDP-43 2', 'siTDP-43 3'))
 metadata <- colData(abud)
 ```
+
+
+
+```{r}
+abudlcpm <- edgeR::cpm(assay(abud, 'counts'),
+                       log = TRUE, 
+                       prior.count = 2)
+
+
+```
+
+```{r}
+table(rowData(d)$gene_id %in% rowData(abud)$gene_id)
+
+rowData(d)$unversioned_gene_id <- sapply(strsplit(rowData(d)$gene_id, '\\.'), function(x) return(x[[1]]))
+rowData(abud)$unversioned_gene_id <- sapply(strsplit(rowData(abud)$gene_id, '\\.'), function(x) return(x[[1]]))
+
+table(rowData(d)$unversioned_gene_id %in% rowData(abud)$unversioned_gene_id)
+
+shared <- intersect(rowData(d)$unversioned_gene_id, rowData(abud)$unversioned_gene_id)
+
+dict <- data.frame(unversioned_gene_id = shared,
+                   ambra = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+
+dict <- merge(dict, rowData(abud)[rowData(abud)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
+              by = 'unversioned_gene_id')
+colnames(dict)[3] <- 'recount'
+```
+
+
+```{r, fig.width = 20, fig.height = 20}
+
+dim(cbind(logcpms[dict$ambra,], abudlcpm[dict$recount,]))
+
+print(corrplot(cor(cbind(logcpms[dict$ambra,],
+                   abudlcpm[dict$recount,]), method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black'))
+```
+
+
+```{r, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$ambra,],
+                            abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+                            abudlcpm[dict$recount,])),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS", item)) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      coord_fixed() + 
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+
+
+
+```
+
+
+
+```{r}
+knitr::knit_exit()
+```
+
+
 
 ## McQuade TREM
 
