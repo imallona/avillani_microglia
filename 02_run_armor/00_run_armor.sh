@@ -1,8 +1,8 @@
 #!/bin/bash
 ##
-## Runs ARMOR on in-house and public data
+## Runs ARMOR on SRP281230 (not present in recount3)
 ##
-## 9th May 2023
+## 11th May 2023
 ## Izaskun Mallona
 
 WD=~/avillani_microglia
@@ -15,14 +15,14 @@ mv ARMOR/config.yaml{,.original}
 
 cd ARMOR
 
-ln -s  ../ambra_config.yaml config.yaml
-ln -s ../metadata_ambra_only.tsv metadata_ambra_only.tsv
+ln -s  ../config_mcquade.yaml config_mcquade.yaml
+ln -s ../metadata_mcquade_only.tsv metadata_mcquade_only.tsv
 
 
-mkdir -p ../ambra_only_output
+mkdir -p ../mcquade_trem_only_output
 
 source ~/miniconda3/bin/activate
 
 # mamba install -c conda-forge -c bioconda  snakemake
 
-nice -n 19 snakemake -s Snakefile --use-conda --configfile config.yaml --cores 50
+nice -n 19 snakemake -s Snakefile --use-conda --configfile config_mcquade.yaml --cores 50

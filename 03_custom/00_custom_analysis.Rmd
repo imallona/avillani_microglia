@@ -64,7 +64,7 @@ library(sva)
 ```{r}
 knitr::opts_chunk$set(fig.width = 8,
                       fig.height = 8,
-                      cache = TRUE,
+                      cache = FALSE,
                       include = TRUE,
                       fig.path = "plots/",
                       dev = c("png"),
@@ -85,6 +85,10 @@ knitr::opts_chunk$set(fig.width = 8,
 
 ## Metadata
 
+```{r}
+options(ggplot2.discrete.fill    = function() scale_fill_brewer(palette = "Set3"))
+options(ggplot2.discrete.color    = function() scale_color_brewer(palette = "Set3"))
+```
 
 ```{r}
 meta <- read.csv(text="treatment,names
@@ -189,7 +193,7 @@ for (item in c('treatment', 'timepoint', 'names')) {
           coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                           ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
           theme_bw() +
-          coord_fixed() + 
+          theme(aspect.ratio=1) +
           theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
                 #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
     cat('\n\n')
@@ -289,7 +293,7 @@ corrplot(cor(cbind(logcpms[dict$ambra,],
 
 ### MDS before batch correction
 
-```{r firstmds, fig.width = 8, fig.height = 5}
+```{r fids, fig.width = 8, fig.height = 5}
 
 mds <- limma::plotMDS(cbind(logcpms[dict$ambra,],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
@@ -372,10 +376,10 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
       labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
-      ## coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
-      ##                 ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
-      coord_fixed() + 
+      theme(aspect.ratio=1) +
       theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
                                         #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
 ```
@@ -386,40 +390,45 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
       geom_point(size=3) +
       labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
-      ## coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
-      ##                 ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
-      coord_fixed() + 
       theme(legend.position='right') +
-      guides(fill=guide_legend(ncol=2)))
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
 
 ```
 
 
 
-```{r}
-
-knitr::knit_exit()
-```
 
 
 
-## McQuade TREM
+## McQuade TREM {.tabset .tabset-pills}
 
-```{r}
+<!-- ```{r} -->
 
-srp <- 'SRP281230'
+<!-- srp <- 'SRP281230' -->
 
-trem <- recount3::create_rse_manual(
-                    project = srp,
-                    project_home = "data_sources/sra",
-                    organism = "human",
-                    annotation = "gencode_v29",
-                    type = "gene")
+<!-- trem <- recount3::create_rse_manual( -->
+<!--                     project = srp, -->
+<!--                     project_home = "data_sources/sra", -->
+<!--                     organism = "human", -->
+<!--                     annotation = "gencode_v29", -->
+<!--                     type = "gene") -->
 
-assay(trem, "counts") <- transform_counts(trem)
+<!-- trem <- subset(trem, -->
+<!--                select = colData(trem)$external_id %in%  meta$names) -->
 
-```
+<!-- assay(trem, "counts") <- transform_counts(trem) -->
+
+
+<!-- ``` -->
+
+
+
+
 
 ## McQuade
 
@@ -436,6 +445,169 @@ mc <- recount3::create_rse_manual(
 assay(mc, "counts") <- transform_counts(mc)
 
 ```
+
+```{r}
+mc <- subset(mc,
+               select = colData(mc)$external_id %in%  meta$names)
+
+assay(mc, "counts") <- transform_counts(mc)
+```
+
+
+
+
+```{r}
+mclcpm <- edgeR::cpm(assay(mc, 'counts'),
+                       log = TRUE, 
+                       prior.count = 2)
+
+
+```
+
+```{r}
+## table(rowData(d)$gene_id %in% rowData(mc)$gene_id)
+
+rowData(d)$unversioned_gene_id <- sapply(strsplit(rowData(d)$gene_id, '\\.'), function(x) return(x[[1]]))
+rowData(mc)$unversioned_gene_id <- sapply(strsplit(rowData(mc)$gene_id, '\\.'), function(x) return(x[[1]]))
+
+## table(rowData(d)$unversioned_gene_id %in% rowData(mc)$unversioned_gene_id)
+
+shared <- intersect(rowData(d)$unversioned_gene_id, rowData(mc)$unversioned_gene_id)
+
+dict <- data.frame(unversioned_gene_id = shared,
+                   ambra = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+
+dict <- merge(dict, rowData(mc)[rowData(mc)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
+              by = 'unversioned_gene_id')
+colnames(dict)[3] <- 'recount'
+```
+
+
+```{r, fig.width = 25, fig.height = 25}
+
+## dim(cbind(logcpms[dict$ambra,], mclcpm[dict$recount,]))
+
+corrplot(cor(cbind(logcpms[dict$ambra,],
+                   mclcpm[dict$recount,]), method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
+```
+
+### MDS before batch correction
+
+```{r firstmds, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$ambra,],
+                            mclcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+                            mclcpm[dict$recount,])),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      coord_fixed() + 
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# nonparametric adjustment
+combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$ambra,],
+                                    mclcpm[dict$recount,]),
+                          batch = mds$origin,
+                          mod = NULL, par.prior = FALSE, prior.plots = TRUE)
+
+```
+
+### MDS after batch, batches
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_mc, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+                            mclcpm[dict$recount,])),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+### MDS after batch, annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
+
+
+```{r}
+
+knitr::knit_exit()
+```
+
 
 
 # Procedure
