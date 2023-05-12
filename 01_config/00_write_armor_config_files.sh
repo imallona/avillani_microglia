@@ -245,14 +245,14 @@ EOF
 
 cat << EOF > metadata_mcquade_only.tsv
 names${TAB}type${TAB}treatment${TAB}batch${TAB}mutation
-SRR12608405${TAB}PE${TAB}iPSC_MG_WT_(McQuade)${TAB}mccquade_trem2${TAB}WT
-SRR12608406${TAB}PE${TAB}iPSC_MG_WT_(McQuade)${TAB}mccquade_trem2${TAB}WT
-SRR12608407${TAB}PE${TAB}iPSC_MG_WT_(McQuade)${TAB}mccquade_trem2${TAB}WT
-SRR12608408${TAB}PE${TAB}iPSC_MG_WT_(McQuade)${TAB}mccquade_trem2${TAB}WT
-SRR12608409${TAB}PE${TAB}iPSC_MG_TREM2_KO_(McQuade)${TAB}mccquade_trem2${TAB}TREM2_KO
-SRR12608410${TAB}PE${TAB}iPSC_MG_TREM2_KO_(McQuade)${TAB}mccquade_trem2${TAB}TREM2_KO
-SRR12608411${TAB}PE${TAB}iPSC_MG_TREM2_KO_(McQuade)${TAB}mccquade_trem2${TAB}TREM2_KO
-SRR12608412${TAB}PE${TAB}iPSC_MG_TREM2_KO_(McQuade)${TAB}mccquade_trem2${TAB}TREM2_KO
+SRR12608405${TAB}PE${TAB}iPSC_MG_WT_McQuade${TAB}mccquade_trem2${TAB}WT
+SRR12608406${TAB}PE${TAB}iPSC_MG_WT_McQuade${TAB}mccquade_trem2${TAB}WT
+SRR12608407${TAB}PE${TAB}iPSC_MG_WT_McQuade${TAB}mccquade_trem2${TAB}WT
+SRR12608408${TAB}PE${TAB}iPSC_MG_WT_McQuade${TAB}mccquade_trem2${TAB}WT
+SRR12608409${TAB}PE${TAB}iPSC_MG_TREM2_KO_McQuade${TAB}mccquade_trem2${TAB}TREM2_KO
+SRR12608410${TAB}PE${TAB}iPSC_MG_TREM2_KO_McQuade${TAB}mccquade_trem2${TAB}TREM2_KO
+SRR12608411${TAB}PE${TAB}iPSC_MG_TREM2_KO_McQuade${TAB}mccquade_trem2${TAB}TREM2_KO
+SRR12608412${TAB}PE${TAB}iPSC_MG_TREM2_KO_McQuade${TAB}mccquade_trem2${TAB}TREM2_KO
 EOF
 
 
@@ -334,7 +334,7 @@ metatxt: metadata_mcquade_only.tsv
 ## of the form "~ <predictors>"
 ## contrast: (comma-separated if multiple) list of contrasts to estimate in edgeR_dge.Rmd
 design: "~ 0 + treatment"
-contrast: treatmentiPSC_MG_TREM2_KO_(McQuade)-treatmentiPSC_MG_WT_(McQuade)
+contrast: treatmentiPSC_MG_TREM2_KO_McQuade-treatmentiPSC_MG_WT_McQuade
 ## Gene sets used for gene set analysis with camera
 ## Comma-separated list of gene set categories to test with camera. 
 ## Must be a subset of H,C1,C2,C3,C4,C5,C6,C7

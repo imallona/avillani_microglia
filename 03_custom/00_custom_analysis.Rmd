@@ -80,6 +80,36 @@ knitr::opts_chunk$set(fig.width = 8,
 
 # Aim
 
+## Comparison to public data
+
+> Compare to published datasets (see block1, 2 and 3). The highest priority,m is to compare to those in block 1 (from Abud et al.).
+
+Results: see X.
+
+> Do they express typical microglial genes (I have a list)
+
+Results: discuss which embedding to use
+
+> They express genes relevant in neurodegenerative disorders (I have a list)
+
+Results: discuss which embedding to use
+
+
+> 1. The different mutants still becomes microglia (add to the MDS?)
+>        a. Slc37a2 I have 2 different mutants (clones) same gene (but different mutation)
+>        b. TREM2 I just have 1 mutant
+
+>2. They are indeed mutants 
+>        a. RNA level reduced compared to WT. As WT for comparison use the 2 from av165 (same round of differentiation)
+>        b. Alignment to WT sequence?
+
+
+> 3. The TREM2 mutant has the typical signature of microglia missing this gene according to literature
+>        a. Compare to McQuade TREM2 KO (highlighted in yellow in the spreadsheet)
+>        b. Lipid metabolism affected (expected)
+```
+
+
 # Data
 
 
@@ -152,6 +182,14 @@ iPSC_MG_TREM2_mut,20220504.B-TREM2-A1_1_R1
 iPSC_MG_TREM2_mut,20220504.B-TREM2-A1_2_R1")
 ```
 
+```{r}
+meta$origin <- 'Ambra'
+
+meta$origin[grepl('Abud', meta$treatment)] <- 'Abud'
+meta$origin[grepl('McQuade', meta$treatment)] <- 'McQuade iPSC'
+meta$origin[grepl('SRR126', meta$names)] <- 'McQuade TREM'
+
+```
 
 ## Ambra's
 
@@ -273,9 +311,10 @@ rowData(abud)$unversioned_gene_id <- sapply(strsplit(rowData(abud)$gene_id, '\\.
 shared <- intersect(rowData(d)$unversioned_gene_id, rowData(abud)$unversioned_gene_id)
 
 dict <- data.frame(unversioned_gene_id = shared,
-                   ambra = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+                   armor = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
 
-dict <- merge(dict, rowData(abud)[rowData(abud)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
+dict <- merge(dict, rowData(abud)[rowData(abud)$unversioned_gene_id %in% shared,
+                                  c('unversioned_gene_id', 'gene_id')],
               by = 'unversioned_gene_id')
 colnames(dict)[3] <- 'recount'
 ```
@@ -283,9 +322,9 @@ colnames(dict)[3] <- 'recount'
 
 ```{r, fig.width = 25, fig.height = 25}
 
-## dim(cbind(logcpms[dict$ambra,], abudlcpm[dict$recount,]))
+## dim(cbind(logcpms[dict$armor,], abudlcpm[dict$recount,]))
 
-corrplot(cor(cbind(logcpms[dict$ambra,],
+corrplot(cor(cbind(logcpms[dict$armor,],
                    abudlcpm[dict$recount,]), method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
@@ -295,7 +334,7 @@ corrplot(cor(cbind(logcpms[dict$ambra,],
 
 ```{r fids, fig.width = 8, fig.height = 5}
 
-mds <- limma::plotMDS(cbind(logcpms[dict$ambra,],
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
@@ -306,13 +345,13 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
                       MDS2 = mds$y)
 }
 
-mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
 mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
@@ -326,7 +365,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
-      coord_fixed() + 
+      theme(aspect.ratio=1) +
       theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
                                         #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
 
@@ -339,7 +378,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 
 ```{r}
 # parametric adjustment
-combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$ambra,],
+combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
                                     abudlcpm[dict$recount,]),
                           batch = mds$origin,
                           mod = NULL, par.prior = TRUE, prior.plots = TRUE)
@@ -360,13 +399,13 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
                       MDS2 = mds$y)
 }
 
-mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
 mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
@@ -427,6 +466,136 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 <!-- ``` -->
 
 
+```{r}
+trem <- readRDS('/home/imallona/avillani_microglia/mcquade_trem_only_output/outputR/shiny_sce.rds')$sce_gene
+
+trem <- subset(trem,
+               select = colData(trem)$names %in%  meta$names)
+
+tremlcpm <- assay(trem, "logcpm")
+
+```
+
+### Correlations
+
+```{r, fig.width = 25, fig.height = 25}
+
+
+corrplot(cor(cbind(logcpms[dict$armor,],
+                   tremlcpm[dict$armor,]), method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
+```
+
+
+### MDS before batch correction
+
+```{r, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
+                           tremlcpm[dict$armor,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
+                            tremlcpm[dict$armor,])),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'McQuade TREM', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# parametric adjustment
+combat_trem <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
+                                    tremlcpm[dict$armor,]),
+                          batch = mds$origin,
+                          mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+### MDS after batch correction, batches
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_trem, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
+                            tremlcpm[dict$armor,])),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+# mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Trem', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+### MDS after batch correction, annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
 
 
 
@@ -475,7 +644,7 @@ rowData(mc)$unversioned_gene_id <- sapply(strsplit(rowData(mc)$gene_id, '\\.'), 
 shared <- intersect(rowData(d)$unversioned_gene_id, rowData(mc)$unversioned_gene_id)
 
 dict <- data.frame(unversioned_gene_id = shared,
-                   ambra = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+                   armor = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
 
 dict <- merge(dict, rowData(mc)[rowData(mc)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
               by = 'unversioned_gene_id')
@@ -485,9 +654,9 @@ colnames(dict)[3] <- 'recount'
 
 ```{r, fig.width = 25, fig.height = 25}
 
-## dim(cbind(logcpms[dict$ambra,], mclcpm[dict$recount,]))
+## dim(cbind(logcpms[dict$armor,], mclcpm[dict$recount,]))
 
-corrplot(cor(cbind(logcpms[dict$ambra,],
+corrplot(cor(cbind(logcpms[dict$armor,],
                    mclcpm[dict$recount,]), method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
@@ -495,9 +664,9 @@ corrplot(cor(cbind(logcpms[dict$ambra,],
 
 ### MDS before batch correction
 
-```{r firstmds, fig.width = 8, fig.height = 5}
+```{r, fig.width = 8, fig.height = 5}
 
-mds <- limma::plotMDS(cbind(logcpms[dict$ambra,],
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
@@ -508,13 +677,13 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,])),
                       MDS1 = mds$x,
                       MDS2 = mds$y)
 }
 
-mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+#mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
 
 mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
@@ -541,10 +710,10 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 
 ```{r}
 # nonparametric adjustment
-combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$ambra,],
+combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
                                     mclcpm[dict$recount,]),
                           batch = mds$origin,
-                          mod = NULL, par.prior = FALSE, prior.plots = TRUE)
+                          mod = NULL, par.prior = TRUE, prior.plots = TRUE)
 
 ```
 
@@ -562,13 +731,13 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$ambra,],
+    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,])),
                       MDS1 = mds$x,
                       MDS2 = mds$y)
 }
 
-mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+#mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
 
 mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
@@ -603,14 +772,126 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 ```
 
 
-```{r}
+# All data combined
 
-knitr::knit_exit()
+```{r}
+pre <- cbind(logcpms[dict$armor,],
+             abudlcpm[dict$recount,],
+             tremlcpm[dict$armor,],
+             mclcpm[dict$recount,])
 ```
 
 
 
-# Procedure
+
+## MDS before batch correction
+
+```{r firstmds, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(pre, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(pre),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'public', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio = 1) + 
+      theme(legend.position='right')) 
+
+
+```
+
+## Batch correction
+
+
+```{r}
+
+pre <- pre[,meta$names]
+
+stopifnot(all(colnames(pre) == meta$names))
+
+
+# nonparametric adjustment
+post <- sva::ComBat(dat=pre,
+                    batch = meta$origin,
+                    mod = NULL, par.prior = FALSE, prior.plots = TRUE)
+
+```
+
+## MDS after batch correction, batches
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(post, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(post) - 1),
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE)
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(post),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+# mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right'))
+```
+
+## MDS after batch correction, annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(color=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
+
 
 
 # Timestamp
@@ -618,5 +899,5 @@ knitr::knit_exit()
 ```{r sessionInfo2, cache = FALSE}
 date()
 sessionInfo()
-devtools::session_info()
+## devtools::session_info()
 ```
