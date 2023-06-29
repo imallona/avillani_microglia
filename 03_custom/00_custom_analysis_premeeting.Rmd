@@ -256,7 +256,7 @@ corrplot(cor(logcpms, method= 'spearman'),
 ```{r, fig.width = 10, fig.height = 10}
 corrplot(cor(logcpms[head(order(rowVars(logcpms), decreasing = TRUE), 500),], method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
-         addCoef.col  = 'black', number.cex  =  0.8, order  =  'hclust', diag = TRUE)
+         addCoef.col  = 'white', number.cex  =  0.8, order  =  'hclust', diag = TRUE)
 
 
 
@@ -327,7 +327,7 @@ colnames(dict)[3] <- 'recount'
 corrplot(cor(cbind(logcpms[dict$armor,],
                    abudlcpm[dict$recount,]), method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
-          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
 ```
 
 ### MDS before batch correction
@@ -484,7 +484,7 @@ tremlcpm <- assay(trem, "logcpm")
 corrplot(cor(cbind(logcpms[dict$armor,],
                    tremlcpm[dict$armor,]), method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
-          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
 ```
 
 
@@ -599,9 +599,9 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 
 
 
-## McQuade
+## McQuade {.tabset .tabset-pills}
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 srp <- 'SRP155574'
 
 mc <- recount3::create_rse_manual(
@@ -651,6 +651,8 @@ dict <- merge(dict, rowData(mc)[rowData(mc)$unversioned_gene_id %in% shared, c('
 colnames(dict)[3] <- 'recount'
 ```
 
+### Correlations
+
 
 ```{r, fig.width = 25, fig.height = 25}
 
@@ -659,7 +661,7 @@ colnames(dict)[3] <- 'recount'
 corrplot(cor(cbind(logcpms[dict$armor,],
                    mclcpm[dict$recount,]), method= 'spearman'),
          method  =  'circle', type  =  'lower', insig = 'blank',
-          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'black')
+          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
 ```
 
 ### MDS before batch correction
@@ -691,15 +693,14 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
 ```{r, fig.width = 10, fig.height = 4, results = 'asis'}
 
-print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
       geom_point(size=3) +
       labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
-      coord_fixed() + 
-      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
-                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+      theme(aspect.ratio = 1) +
+      theme(legend.position='right'))
 
 
 
@@ -772,7 +773,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 ```
 
 
-# All data combined
+# All data combined {.tabset .tabset-pills}
 
 ```{r}
 pre <- cbind(logcpms[dict$armor,],
@@ -781,10 +782,40 @@ pre <- cbind(logcpms[dict$armor,],
              mclcpm[dict$recount,])
 ```
 
+## Correlations (all genes)
+
+```{r, fig.width = 30, fig.height = 30}
+
+## dim(cbind(logcpms[dict$armor,], mclcpm[dict$recount,]))
+
+cnames <- colnames(pre)
+colnames(pre) <- meta[meta$names == colnames(pre), 'treatment']
+
+corrplot(cor(pre, method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+         number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
 
 
+```
 
-## MDS before batch correction
+## Correlations (top 500 variable genes)
+
+
+```{r, fig.width = 30, fig.height = 30}
+corrplot(cor(pre[head(order(rowVars(pre), decreasing = TRUE), 500),], method= 'spearman'),
+         method  =  'circle', type  =  'lower', insig = 'blank',
+         addCoef.col  = 'white', number.cex  =  0.8, order  =  'hclust', diag = TRUE)
+
+
+```
+
+
+```{r}
+## take the original colnames back
+colnames(pre) <- cnames
+```
+
+## MDS before batch correction, batches
 
 ```{r firstmds, fig.width = 8, fig.height = 5}
 
@@ -823,6 +854,23 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 
 ```
 
+
+## MDS before batch correction, annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
+      geom_point(size=3) +
+      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(color=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1))
+
+```
+
+
 ## Batch correction
 
 
@@ -833,10 +881,10 @@ pre <- pre[,meta$names]
 stopifnot(all(colnames(pre) == meta$names))
 
 
-# nonparametric adjustment
+# nonparametric adjustment is as bad
 post <- sva::ComBat(dat=pre,
                     batch = meta$origin,
-                    mod = NULL, par.prior = FALSE, prior.plots = TRUE)
+                    mod = NULL, par.prior = TRUE, prior.plots = TRUE)
 
 ```
 
@@ -866,7 +914,7 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 ```
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
-print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
       geom_point(size=3) +
       labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
@@ -879,7 +927,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ## MDS after batch correction, annotation
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
-print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
       geom_point(size=3) +
       labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
@@ -887,8 +935,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
       theme_bw() +
       theme(legend.position='right') +
       guides(color=guide_legend(ncol=2)) +
-      theme(aspect.ratio=1) +
-      scale_color_brewer(palette = "Set3"))
+      theme(aspect.ratio=1))
 
 ```
 
