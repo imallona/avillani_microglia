@@ -102,20 +102,33 @@ knitr::opts_chunk$set(fig.width = 8,
 
 # Aim
 
-## Comparison to public data
 
-```
 > Compare to published datasets (see block1, 2 and 3). The highest priority,m is to compare to those in block 1 (from Abud et al.).
 
-Results: see X.
+Methods: We processed our RNA-seq, McQuade's TREM raw reads with ARMOR (PMID 31088905). Briefly, reads were aligned and counted to the human genome (GRCh38 assembly and Gencode release 43) with salmon v1.4.0 and with STAR 2.7.7a. Differential expression analysis was carried out with edgeR v3.36.0 using salmon outputs. 
+
+We downloaded Abud's and McQuade's iPSCs data from the Sequence Read Archive (SRA) accessions SRP092075 and SRP155574, respectively, using recount3 (PMID 34844637) and GRCh38 as reference genome and Gencode's annotation. 
+
+Results: We detect 'strong' age effects (within Villani's WTs), 'weak' mutant effects (within Villani's mutant), generalized batch effects which are hard to deal with when comparing to Abud's, McQuade's data. The MDS plot after batch correction of Villani's WT + Villani's mutants + Abud's looks the best; the same MDS without Villani's mutants not so much.
+
+See `Comparison of Villani's, Abud's, McQuade's data`.
 
 > Do they express typical microglial genes (I have a list)
 
-Results: discuss which embedding to use
+Methods: We generated multi-dimensional scaling (MDS) plots based on normalized count data using edgeR v3.36.0. Briefly, MDS plots depict similarities between samples (including replicates and batches) in an unsupervised manner, depicting the two leading fold-change dimensions which explain the largest proportion of variation in gene expression across samples.
+
+Results: Please use the iSEE deployments:
+
+-
+-
+-
+
+Mind there you can select 'counts', 'CPMs' or 'logCPMs'. My recommendation would be to check 'CPMs' or 'logCPMs', so you have readouts that don't depend on sequencing depth.
+
 
 > They express genes relevant in neurodegenerative disorders (I have a list)
 
-Results: discuss which embedding to use
+Results: See above.
 
 
 > 1. The different mutants still becomes microglia (add to the MDS?)
@@ -126,15 +139,18 @@ Results: discuss which embedding to use
 >        a. RNA level reduced compared to WT. As WT for comparison use the 2 from av165 (same round of differentiation)
 >        b. Alignment to WT sequence?
 
+Results: please browse the STAR BAM files.
 
 > 3. The TREM2 mutant has the typical signature of microglia missing this gene according to literature
 >        a. Compare to McQuade TREM2 KO (highlighted in yellow in the spreadsheet)
 >        b. Lipid metabolism affected (expected)
-```
 
 
-# MDS/ data overview
+Methods: (add enrich analysis here)
 
+Results: 
+
+# Comparison of Villani's, Abud's, McQuade's data
 
 ## Metadata
 
@@ -247,7 +263,8 @@ if (!is.null(mds$cmdscale.out)) {
 } else {
     mds <- data.frame(names = colnames(logcpms),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y,
+                      var.explained = mds$var.explained)
 }
 mds <- mds %>% 
     dplyr::full_join(data.frame(colData(d)), by = "names")
@@ -264,7 +281,9 @@ for (item in c('treatment', 'timepoint', 'names', 'timepoint')) {
     cat('#### ', item, '\n\n')
     print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
           geom_point(size=3) +
-          labs(x="Dimension 1", y="Dimension 2", title= paste("MDS", item)) +
+          labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100),
+               title= paste("MDS", item)) +
           coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                           ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
           theme_bw() +
@@ -376,7 +395,7 @@ mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -386,7 +405,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
@@ -399,7 +418,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS before ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -432,7 +452,7 @@ combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -442,7 +462,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
@@ -454,7 +474,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -468,7 +489,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -506,7 +528,7 @@ mds <- limma::plotMDS(cbind(logcpms[dict$armor,ambra_wts],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -516,7 +538,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,ambra_wts],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
@@ -532,7 +554,8 @@ for (item in c('treatment', 'age', 'names')) {
     
     print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
           geom_point(size=3) +
-          labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+         labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS before ComBat")) +
           coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                           ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
           theme_bw() +
@@ -565,7 +588,7 @@ combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,ambra_wts],
 mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -575,7 +598,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,ambra_wts],
                             abudlcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
@@ -591,7 +614,8 @@ for (item in c('treatment', 'names', 'age')) {
     
     print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
           geom_point(size=3) +
-          labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+         labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
           coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                           ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
           theme_bw() +
@@ -607,7 +631,8 @@ for (item in c('treatment', 'names', 'age')) {
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = age), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -680,7 +705,7 @@ mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                            tremlcpm[dict$armor,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -690,7 +715,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             tremlcpm[dict$armor,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'McQuade TREM', no = 'Ambra')
@@ -703,7 +728,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS before ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -736,7 +762,7 @@ combat_trem <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 mds <- limma::plotMDS(combat_trem, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -746,7 +772,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             tremlcpm[dict$armor,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 # mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Trem', no = 'Ambra')
@@ -760,7 +786,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -774,7 +801,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -860,7 +888,7 @@ mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -870,7 +898,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 #mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
@@ -883,7 +911,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS before ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -915,7 +944,7 @@ combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 mds <- limma::plotMDS(combat_mc, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -925,7 +954,7 @@ if (!is.null(mds$cmdscale.out)) {
     mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,])),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 #mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
@@ -937,7 +966,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -951,7 +981,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -1014,7 +1045,7 @@ colnames(pre) <- cnames
 mds <- limma::plotMDS(pre, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -1023,7 +1054,7 @@ if (!is.null(mds$cmdscale.out)) {
 } else {
     mds <- data.frame(names = colnames(pre),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'public', no = 'Ambra')
@@ -1036,7 +1067,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS before ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS before ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -1052,7 +1084,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -1089,7 +1122,7 @@ post <- sva::ComBat(dat=pre,
 mds <- limma::plotMDS(post, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(post) - 1),
                       gene.selection = "common",
-                      xlab = NULL, ylab = NULL, plot = FALSE)
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
     ## Bioc 3.12 and earlier
     mds <- mds$cmdscale.out
@@ -1098,7 +1131,7 @@ if (!is.null(mds$cmdscale.out)) {
 } else {
     mds <- data.frame(names = colnames(post),
                       MDS1 = mds$x,
-                      MDS2 = mds$y)
+                      MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 # mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
@@ -1110,7 +1143,8 @@ mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -1123,7 +1157,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
 print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
       geom_point(size=3) +
-      labs(x="Dimension 1", y="Dimension 2", title= paste("MDS after ComBat")) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", round(mds$var.explained[1],2)*100),
+               y = sprintf("Dim. 2, var. exp. %s%%", round(mds$var.explained[2], 2)*100), title= paste("MDS after ComBat")) +
       coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
                       ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
       theme_bw() +
@@ -1349,6 +1384,7 @@ if (is(edgeR_res, "data.frame")) {
                          pCutoff = 0.05,
                          FCcutoff = 0.5,
                          pointSize = 3.0,
+                         drawConnectors = TRUE,
                          labSize = 6.0))
              
         fn <-  paste0("edgeR_dge_results_", nm, "_all_ages.txt")
@@ -1559,7 +1595,7 @@ if (is(edgeR_res, "data.frame")) {
 
 
 
-## Villani's data, mutants vs 28-days-old WTs 
+# Villani's data, mutants vs 28-days-old WTs 
 
 ## Filter data to remove WTs older than 28 days
 
@@ -1755,6 +1791,7 @@ if (is(edgeR_res, "data.frame")) {
                          subtitle = nm,
                          pCutoff = 0.05,
                          FCcutoff = 0.5,
+                         drawConnectors = TRUE,
                          pointSize = 3.0,
                          labSize = 6.0))
              
@@ -1966,7 +2003,13 @@ if (is(edgeR_res, "data.frame")) {
 
 
 
-# Export datasets
+# iSEE instances and data objects
+
+
+```{r, results = 'asis'}
+
+```
+
 
 
 # Timestamp
