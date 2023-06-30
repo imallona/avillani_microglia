@@ -1,6 +1,6 @@
 ---
-title: "A. Villani's microglia RNAseq"
-author: "Izaskun Mallona, UZH"
+title: "Ambra Villani's microglia RNA-seq"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -237,6 +237,8 @@ meta$origin[grepl('SRR126', meta$names)] <- 'McQuade TREM'
 
 ```
 
+Data included in this analysis:
+
 ```{r, results = 'asis'}
 (DT::datatable(meta, rownames = FALSE, 
                 extensions = 'Buttons',
@@ -247,7 +249,7 @@ meta$origin[grepl('SRR126', meta$names)] <- 'McQuade TREM'
 ```
 
 
-## Ambra's {.tabset .tabset-pills}
+## Overview of inhouse data alone {.tabset .tabset-pills}
 
 ```{r}
 d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_sce.rds')$sce_gene
@@ -328,7 +330,7 @@ for (item in c('treatment', 'timepoint', 'names', 'timepoint')) {
 <!-- ``` -->
 
 
-## Abud vs Villani's wildtypes and mutants {.tabset .tabset-pills}
+## Villani's wildtypes and mutants and Abud's data {.tabset .tabset-pills}
 
 <!-- ### Correlations -->
 
@@ -510,7 +512,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 
 
 
-## Abud vs Villani's wildtypes only  {.tabset .tabset-pills}
+## Villani's wildtypes (no mutants) and Abud's data {.tabset .tabset-pills}
 
 ```{r}
 ambra_wts <- meta[meta$treatment == 'iPSC_MG', 'names']
@@ -653,7 +655,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = age), alpha=1) 
 
 
 
-## McQuade TREM {.tabset .tabset-pills}
+## Villani's wildtypes and mutants and McQuade TREM data {.tabset .tabset-pills}
 
 <!-- ```{r} -->
 
@@ -822,7 +824,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 
 
 
-## McQuade {.tabset .tabset-pills}
+## Villani's wildtypes and mutants and McQuade's iPSCs data {.tabset .tabset-pills}
 
 ```{r, message = FALSE, warning = FALSE}
 srp <- 'SRP155574'
@@ -1001,7 +1003,7 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 ```
 
 
-# All data combined {.tabset .tabset-pills}
+# Joint embedding of Villani's plus public data, combined {.tabset .tabset-pills}
 
 ```{r}
 pre <- cbind(logcpms[dict$armor,],
@@ -1186,11 +1188,6 @@ step, please refer to the
 [edgeR user guide](https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf).
 
 
-## Load `SummarizedExperiment` object
-
-We load the `SummarizedExperiment` objects prepared using `tximeta`, containing
-gene- and transcript-level counts and feature lengths. In this report, we will
-use the gene-level quantifications.
 
 ```{r edgeR-print-se}
 ## List of SummarizedExperiment objects (gene/transcript level)
@@ -1256,8 +1253,6 @@ stopifnot(all(rownames(logcpms) == rownames(sg)),
           all(colnames(logcpms) == colnames(sg)))
 assay(sg, "logcpm") <- logcpms
 ```
-
-## Define design
 
 Next, we specify the design matrix of the experiment, defining which sample 
 annotations will be taken into account in the statistical modeling.
@@ -1583,18 +1578,21 @@ camera_res <- lapply(contrasts, function(cm) {
 ```{r camera-save-results, results = 'asis', eval = !is.null(genesets), include = !is.null(genesets)}
 ## Write results to text files
 if (is(camera_res, "data.frame")) {
-    write.table(camera_res %>% tibble::rownames_to_column("GeneSet") %>%
-                    dplyr::arrange(PValue),
-                file = "camera_dge_results.txt",
-                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+    ## write.table(camera_res %>% tibble::rownames_to_column("GeneSet") %>%
+    ##                 dplyr::arrange(PValue),
+    ##             file = "camera_dge_results.txt",
+    ##             sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
 } else {
     for (nm in names(camera_res)) {
         cat('### ', nm, '\n\n')
 
-        cat('Significantly (FDR > 0.05) enriched/depleted genesets for this contrast:')
-        
-        print(table(camera_res[[nm]]$FDR < 0.05))
+        cat('Significantly (before multiple testing correction, pvalue 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$PValue < 0.05))
+        cat('\n\n')
 
+        
+        cat('Significantly (FDR < 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$FDR < 0.05))
         cat('\n\n')
         
         fn <- paste0("camera_dge_results_", nm, "_all_ages.txt")
@@ -1620,7 +1618,7 @@ saveRDS(list(cameraRes = camera_res,
 
 
 
-# Villani's data, mutants vs 28-days-old WTs 
+# Differential expression: mutants vs 28-days-old WTs 
 
 ## Filter data to remove WTs older than 28 days
 
@@ -1682,8 +1680,6 @@ stopifnot(all(rownames(logcpms) == rownames(sg)),
           all(colnames(logcpms) == colnames(sg)))
 assay(sg, "logcpm") <- logcpms
 ```
-
-## Define design
 
 Next, we specify the design matrix of the experiment, defining which sample 
 annotations will be taken into account in the statistical modeling.
@@ -1925,9 +1921,54 @@ if (is(edgeR_res, "data.frame")) {
 <!-- ``` -->
 
 
-### Geneset analysis {.tabset .tabset-pills}
+## Geneset analysis {.tabset .tabset-pills}
 
-```{r camera-perform-tests, eval = !is.null(genesets), include = !is.null(genesets)}
+
+```{r, eval = !is.null(genesets), include = !is.null(genesets)}
+## genesets <- 'H,C1,C2,C3,C5,C8'
+genesets <- 'C2,C5,C8'
+genesets <- strsplit(gsub(" ","",genesets), ",")[[1]]
+
+organism <- 'human'
+
+## Retrieve gene sets and combine in a tibble
+m_df <- bind_rows(lapply(genesets,
+                         function(x) msigdbr(species = organism, category = x)))
+
+minSize <- 3
+maxSize <- 500
+
+## Get index for genes in each gene set in the DGEList
+indexList <- limma::ids2indices(
+    gene.sets = lapply(split(m_df, f = m_df$gs_name), function(w) w$gene_symbol),
+    identifiers = dge$genes$gene_name,
+    remove.empty = TRUE
+)
+
+## Filter out too small or too large gene sets
+gsSizes <- vapply(indexList, length, 0)
+indexList <- indexList[gsSizes >= minSize & gsSizes <= maxSize]
+```
+
+```{r, eval = !is.null(genesets), include = FALSE}
+## Check if the index list is empty after filtering
+if (length(indexList) == 0){
+  genesets <- NULL
+  empty <- TRUE
+} else {
+  empty <- FALSE
+}
+```
+
+```{r, eval = !is.null(genesets), include = !is.null(genesets)}
+geneSets <- lapply(indexList, function(i) dge$genes$gene_name[i])
+saveRDS(list(cameraRes = camera_res,
+             geneSets = geneSets), file = "camera_gsa_28_days_only.rds")
+```
+
+
+
+```{r camera-perform-tests, cache = FALSE, eval = !is.null(genesets), include = !is.null(genesets)}
 camera_res <- lapply(contrasts, function(cm) {
     camera(dge, index = indexList, design = des, contrast = cm,
            inter.gene.cor = NA)
@@ -1947,13 +1988,17 @@ if (is(camera_res, "data.frame")) {
     for (nm in names(camera_res)) {
         cat('### ', nm, '\n\n')
 
-        cat('Significantly (FDR > 0.05) enriched/depleted genesets for this contrast:')
-        
-        print(table(camera_res[[nm]]$FDR < 0.05))
 
+        cat('Significantly (before multiple testing correction, pvalue 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$PValue < 0.05))
+        cat('\n\n')
+
+        
+        cat('Significantly (FDR < 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$FDR < 0.05))
         cat('\n\n')
         
-        fn <- paste0("camera_dge_results_", nm, "_all_ages.txt")
+        fn <- paste0("camera_dge_results_", nm, "_28_days_only.txt")
         write.table(camera_res[[nm]] %>%
                         tibble::rownames_to_column("GeneSet") %>%
                         dplyr::arrange(PValue),
@@ -1965,13 +2010,6 @@ if (is(camera_res, "data.frame")) {
         
     }
 }
-```
-
-
-```{r, eval = !is.null(genesets), include = !is.null(genesets)}
-geneSets <- lapply(indexList, function(i) dge$genes$gene_name[i])
-saveRDS(list(cameraRes = camera_res,
-             geneSets = geneSets), file = "camera_gsa_28_days_only.rds")
 ```
 
 
