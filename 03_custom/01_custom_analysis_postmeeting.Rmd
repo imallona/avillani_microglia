@@ -100,6 +100,7 @@ knitr::opts_chunk$set(fig.width = 8,
 ## options(bitmapType='cairo')
 ```
 
+
 # Aim
 
 
@@ -123,13 +124,12 @@ Results: Please use the iSEE deployments:
 -
 -
 
-Mind there you can select 'counts', 'CPMs' or 'logCPMs'. My recommendation would be to check 'CPMs' or 'logCPMs', so you have readouts that don't depend on sequencing depth.
+Mind the iSEE deployments show 'counts', 'CPMs' or 'logCPMs'. My recommendation is to check 'CPMs' or 'logCPMs', so readouts are already normalized/don't depend on sequencing depth.
 
 
 > They express genes relevant in neurodegenerative disorders (I have a list)
 
-Results: See above.
-
+Results: See the iSEE deployments above.
 
 > 1. The different mutants still becomes microglia (add to the MDS?)
 >        a. Slc37a2 I have 2 different mutants (clones) same gene (but different mutation)
@@ -156,6 +156,10 @@ Methods: We ran a geneset enrichment analysis using `camera` from limma v3.50.3 
 - C8, cell type signatures
 
 Results: please check sections named `Geneset analysis`.
+
+# Notes
+
+Plots in PNG and SVG format <a href="plots_post/">can be browsed here</a>.
 
 # Comparison of Villani's, Abud's, McQuade's data
 
@@ -249,7 +253,7 @@ Data included in this analysis:
 ```
 
 
-## Overview of inhouse data alone {.tabset .tabset-pills}
+## Overview of Villani's data {.tabset .tabset-pills}
 
 ```{r}
 d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_sce.rds')$sce_gene
@@ -328,6 +332,12 @@ for (item in c('treatment', 'timepoint', 'names', 'timepoint')) {
 
 
 <!-- ``` -->
+
+
+
+```{r}
+saveRDS(d, file = 'ambra_villani_only_sce.rds')
+```
 
 
 ## Villani's wildtypes and mutants and Abud's data {.tabset .tabset-pills}
@@ -510,6 +520,33 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 
 ```
 
+
+```{r}
+
+tmp <- list(logcpms = cbind(logcpms[dict$armor,],
+                            abudlcpm[dict$recount,]),
+            counts = cbind(counts(d)[dict$armor,],
+                           assay(abud, 'raw_counts')[dict$recount,]))
+tmp2 <- meta[meta$names %in% colnames(tmp$counts),]
+rownames(tmp2) <- tmp2$names
+
+
+
+tmp$counts <- tmp$counts[, tmp2$names]
+tmp$logcpms <- tmp$logcpms[, tmp2$names]
+
+saveRDS(object = SingleCellExperiment(assays = tmp,
+                     colData = data.frame(tmp2),
+                     rowData = rowData(d)[dict$armor,],
+                     metadata = list(study = "Villani, Abud"),
+                     reducedDims = list(mds = data.frame(mds[,2:3], row.names = mds[,1]))),
+        file = 'villani_plus_abud_sce.rds')
+
+rm(tmp, tmp2)
+
+## export singlecellexperiment
+
+```
 
 
 ## Villani's wildtypes (no mutants) and Abud's data {.tabset .tabset-pills}
@@ -1176,6 +1213,19 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
       theme(aspect.ratio=1))
 
 ```
+
+
+```{r}
+saveRDS(object = SingleCellExperiment(list(logcpms = pre),
+                     colData = data.frame(meta, row.names  = meta$names),
+                     rowData = rowData(d)[dict$armor,],
+                     metadata = list(study = "Villani, Abud, McQuade"),
+                     reducedDims = list(mds = data.frame(mds[,2:3], row.names = mds[,1]))),
+        file = 'all_data_sce.rds')
+```
+
+
+
 
 # Differential expression: mutants vs WTs (regardless of the WTs age)
 
