@@ -110,7 +110,7 @@ Methods: We processed our RNA-seq, McQuade's TREM raw reads with ARMOR (PMID 310
 
 We downloaded Abud's and McQuade's iPSCs data from the Sequence Read Archive (SRA) accessions SRP092075 and SRP155574, respectively, using recount3 (PMID 34844637) and GRCh38 as reference genome and Gencode's annotation. 
 
-Results: We detect 'strong' age effects (within Villani's WTs), 'weak' mutant effects (within Villani's mutant), generalized batch effects which are hard to deal with when comparing to Abud's, McQuade's data. The MDS plot after batch correction of Villani's WT + Villani's mutants + Abud's looks the best; the same MDS without Villani's mutants not so much.
+Results: We detect noticeable age effects (within Villani's WTs), relatively weaker mutation effects (within Villani's mutant), and batch effects when comparing to Abud's, McQuade's data. The MDS plot after batch correction of Villani's WT + Villani's mutants + Abud's looks the best; the same MDS without Villani's mutants not so.
 
 See `Comparison of Villani's, Abud's, McQuade's data`.
 
@@ -120,11 +120,11 @@ Methods: We generated multi-dimensional scaling (MDS) plots based on normalized 
 
 Results: Please use the iSEE deployments:
 
--
--
--
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_only_2023/
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_plus_abud_2023/
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_plus_abud_and_mcquade_2023/
 
-Mind the iSEE deployments show 'counts', 'CPMs' or 'logCPMs'. My recommendation is to check 'CPMs' or 'logCPMs', so readouts are already normalized/don't depend on sequencing depth.
+Mind the iSEE deployments show 'counts', 'CPMs' and 'logCPMs'. My recommendation is to check 'CPMs' or 'logCPMs', so readouts are already normalized/don't depend on sequencing depth. CPMs and logCPMs were calculated with `edgeR::cpm` and with `prior.count = 2`.
 
 
 > They express genes relevant in neurodegenerative disorders (I have a list)
@@ -146,7 +146,7 @@ Results: please browse the STAR BAM files.
 >        b. Lipid metabolism affected (expected)
 
 
-Methods: We ran a geneset enrichment analysis using `camera` from limma v3.50.3 and [mSigDB](http://software.broadinstitute.org/gsea/msigdb) annotations on differentially expressed genes. Selected genesets included:
+Methods: We ran a geneset enrichment analysis using `camera` from limma v3.50.3 (PMID PMC3458527) and [mSigDB](http://software.broadinstitute.org/gsea/msigdb) annotations on differentially expressed genes. Selected genesets included:
 
 <!-- - H, hallmark gene sets  -->
 <!-- - C1, positional gene sets (cytobands) -->
@@ -159,7 +159,7 @@ Results: please check sections named `Geneset analysis`.
 
 # Notes
 
-Plots in PNG and SVG format <a href="plots_post/">can be browsed here</a>.
+Plots in PNG and SVG format <a href="plots_post/">can be browsed and downloaded here</a>.
 
 # Comparison of Villani's, Abud's, McQuade's data
 
@@ -264,7 +264,7 @@ d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_
 
 logcpms <- assay(d, "logcpm")
 mds <- limma::plotMDS(logcpms, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE,
                       var.explained = TRUE)
@@ -396,6 +396,17 @@ colnames(dict)[3] <- 'recount'
 ```
 
 
+```{r}
+## remove the PAR_Y recount3 which introduce duplicates, i.e.
+
+## dim(dict)
+## print(grep('PAR_Y', dict$recount, value = TRUE))
+
+## dim(dict)
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
+```
+
+
 <!-- ```{r, fig.width = 25, fig.height = 25} -->
 
 <!-- ## dim(cbind(logcpms[dict$armor,], abudlcpm[dict$recount,])) -->
@@ -412,24 +423,23 @@ colnames(dict)[3] <- 'recount'
 
 mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
-if (!is.null(mds$cmdscale.out)) {
-    ## Bioc 3.12 and earlier
-    mds <- mds$cmdscale.out
-    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
-    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
-} else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            abudlcpm[dict$recount,])),
-                      MDS1 = mds$x,
-                      MDS2 = mds$y, var.explained = mds$var.explained)
-}
+
+mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                  MDS1 = mds$x,
+                  MDS2 = mds$y, var.explained = mds$var.explained)
+
+rownames(mds) <- mds$names
+
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
 
 ```
 
@@ -457,7 +467,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 # parametric adjustment
 combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
                                     abudlcpm[dict$recount,]),
-                          batch = mds$origin,
+                           batch = c(rep('ambra', ncol(logcpms)),
+                                       rep('abud', ncol(abudlcpm))),
                           mod = NULL, par.prior = TRUE, prior.plots = TRUE)
 
 ```
@@ -469,7 +480,7 @@ combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 
 ```{r, fig.width = 8, fig.height = 5}
 mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -478,16 +489,17 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            abudlcpm[dict$recount,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
 
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
@@ -516,38 +528,109 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
       theme(legend.position='right') +
       guides(fill=guide_legend(ncol=2)) +
       theme(aspect.ratio=1) +
-      scale_color_brewer(palette = "Set3"))
+     scale_color_brewer(palette = "Set3"))
 
 ```
 
 
 ```{r}
 
+
 tmp <- list(logcpms = cbind(logcpms[dict$armor,],
                             abudlcpm[dict$recount,]),
             counts = cbind(counts(d)[dict$armor,],
                            assay(abud, 'raw_counts')[dict$recount,]))
-tmp2 <- meta[meta$names %in% colnames(tmp$counts),]
-rownames(tmp2) <- tmp2$names
+rownames(meta) <- meta$names
 
+tmp2 <- meta[colnames(tmp$counts),]
+   
 
+tmp$cpms <- edgeR::cpm(tmp$counts, log = TRUE, prior.count = 2)
 
-tmp$counts <- tmp$counts[, tmp2$names]
-tmp$logcpms <- tmp$logcpms[, tmp2$names]
+rownames(mds) <- mds[,1]
 
-saveRDS(object = SingleCellExperiment(assays = tmp,
+mds <- mds[colnames(tmp$counts),]
+
+tmp3 <- SingleCellExperiment(assays = tmp,
                      colData = data.frame(tmp2),
                      rowData = rowData(d)[dict$armor,],
                      metadata = list(study = "Villani, Abud"),
-                     reducedDims = list(mds = data.frame(mds[,2:3], row.names = mds[,1]))),
+                     reducedDims = list(mds = mds[,2:3]))
+                     
+saveRDS(object = tmp3,
         file = 'villani_plus_abud_sce.rds')
 
 rm(tmp, tmp2)
 
-## export singlecellexperiment
+
 
 ```
 
+<!-- # Test -->
+
+
+<!-- ```{r} -->
+<!-- se <- tmp3 -->
+<!-- red.dim <- reducedDim(tmp3, "mds"); -->
+
+<!-- plot.data <- data.frame(X=red.dim[, 1], Y=red.dim[, 2], row.names=colnames(se)); -->
+
+<!-- plot.data$ColorBy <- colData(se)[, "names"]; -->
+
+<!-- print(head(plot.data$ColorBy)) -->
+<!-- plot.data[["ColorBy"]] <- factor(plot.data[["ColorBy"]]); -->
+
+<!-- # Avoid visual biases from default ordering by shuffling the points -->
+<!-- set.seed(44); -->
+<!-- plot.data <- plot.data[sample(nrow(plot.data)),,drop=FALSE]; -->
+
+<!-- dot.plot <- ggplot() + -->
+<!--     geom_point(aes(x=X, y=Y, color=ColorBy), alpha=1, plot.data, size=1) + -->
+<!--     labs(x="Dimension 1", y="Dimension 2", color="names", title="mds") + -->
+<!--     coord_cartesian(xlim=range(plot.data$X, na.rm=TRUE), -->
+<!--         ylim=range(plot.data$Y, na.rm=TRUE), expand=TRUE) + -->
+<!--     theme_bw() + -->
+<!--     theme(legend.position='bottom', legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11), -->
+<!--           axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)) -->
+
+
+<!-- print(dot.plot) -->
+
+
+<!-- red.dim <- reducedDim(se, "mds"); -->
+<!-- plot.data <- data.frame(X=red.dim[, 1], Y=red.dim[, 2], row.names=colnames(se)); -->
+
+<!-- plot.data$ColorBy <- colData(se)[, "names"]; -->
+<!-- plot.data$ColorBy <- as.numeric(as.factor(plot.data$ColorBy)); -->
+
+<!-- # Avoid visual biases from default ordering by shuffling the points -->
+<!-- set.seed(44); -->
+<!-- plot.data <- plot.data[sample(nrow(plot.data)),,drop=FALSE]; -->
+
+<!-- dot.plot <- ggplot() + -->
+<!--     geom_point(aes(x=X, y=Y, color=ColorBy), alpha=1, plot.data, size=1) + -->
+<!--     labs(x="Dimension 1", y="Dimension 2", color="names", title="mds") + -->
+<!--     coord_cartesian(xlim=range(plot.data$X, na.rm=TRUE), -->
+<!--         ylim=range(plot.data$Y, na.rm=TRUE), expand=TRUE) + -->
+<!--     scale_color_gradientn(colors=colDataColorMap(colormap, "names", discrete=FALSE)(21), na.value='grey50', limits=range(plot.data$ColorBy, na.rm=TRUE)) + -->
+<!--     theme_bw() + -->
+<!--     theme(legend.position='bottom', legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11), -->
+<!--             axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)) -->
+
+<!-- # Saving data for transmission -->
+<!-- all_contents[['ReducedDimensionPlot1']] <- plot.data -->
+
+
+<!-- knitr::knit_exit('') -->
+<!-- ``` -->
+
+```{r}
+rm(tmp3)
+```
+
+<!-- ```{r, cache = FALSE} -->
+<!-- knitr::knit_exit() -->
+<!-- ``` -->
 
 ## Villani's wildtypes (no mutants) and Abud's data {.tabset .tabset-pills}
 
@@ -572,7 +655,7 @@ ambra_wts <- meta[meta$treatment == 'iPSC_MG', 'names']
 
 mds <- limma::plotMDS(cbind(logcpms[dict$armor,ambra_wts],
                             abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -581,15 +664,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,ambra_wts],
-                            abudlcpm[dict$recount,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 
 ```
 
@@ -622,7 +706,8 @@ for (item in c('treatment', 'age', 'names')) {
 # parametric adjustment; explore the parametric too
 combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,ambra_wts],
                                     abudlcpm[dict$recount,]),
-                          batch = mds$origin,
+                          batch = c(rep('ambra', length(ambra_wts)),
+                                       rep('abud', ncol(abudlcpm))),
                           mod = NULL, par.prior = TRUE, prior.plots = FALSE)
 
 ```
@@ -632,7 +717,7 @@ combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,ambra_wts],
 
 ```{r, fig.width = 8, fig.height = 5}
 mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -641,16 +726,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,ambra_wts],
-                            abudlcpm[dict$recount,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
@@ -749,7 +834,7 @@ tremlcpm <- assay(trem, "logcpm")
 
 mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                            tremlcpm[dict$armor,]), top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -758,16 +843,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            tremlcpm[dict$armor,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'McQuade TREM', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 10, fig.height = 4, results = 'asis'}
@@ -794,7 +879,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 # parametric adjustment
 combat_trem <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
                                     tremlcpm[dict$armor,]),
-                          batch = mds$origin,
+                           batch = c(rep('ambra', ncol(logcpms)),
+                                     rep('trem', ncol(tremlcpm))),
                           mod = NULL, par.prior = TRUE, prior.plots = TRUE)
 
 ```
@@ -806,7 +892,7 @@ combat_trem <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 
 ```{r, fig.width = 8, fig.height = 5}
 mds <- limma::plotMDS(combat_trem, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -815,16 +901,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            tremlcpm[dict$armor,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 # mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Trem', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 
@@ -932,7 +1018,7 @@ colnames(dict)[3] <- 'recount'
 
 mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
                             mclcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -941,16 +1027,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            mclcpm[dict$recount,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 #mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 10, fig.height = 4, results = 'asis'}
@@ -976,7 +1062,8 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
 # nonparametric adjustment
 combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
                                     mclcpm[dict$recount,]),
-                          batch = mds$origin,
+                         batch = c(rep('ambra', ncol(logcpms)),
+                                   rep('mc', ncol(mclcpm))),
                           mod = NULL, par.prior = TRUE, prior.plots = TRUE)
 
 ```
@@ -988,7 +1075,7 @@ combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
 
 ```{r, fig.width = 8, fig.height = 5}
 mds <- limma::plotMDS(combat_mc, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -997,16 +1084,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(cbind(logcpms[dict$armor,],
-                            mclcpm[dict$recount,])),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 #mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
@@ -1089,7 +1176,7 @@ colnames(pre) <- cnames
 ```{r firstmds, fig.width = 8, fig.height = 5}
 
 mds <- limma::plotMDS(pre, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(logcpms) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -1098,15 +1185,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(pre),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 ## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'public', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 10, fig.height = 4, results = 'asis'}
@@ -1166,7 +1254,7 @@ post <- sva::ComBat(dat=pre,
 
 ```{r, fig.width = 8, fig.height = 5}
 mds <- limma::plotMDS(post, top = 500, labels = NULL, pch = NULL,
-                      cex = 1, dim.plot = c(1, 2), ndim = min(7, ncol(post) - 1),
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
                       gene.selection = "common",
                       xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
 if (!is.null(mds$cmdscale.out)) {
@@ -1175,15 +1263,16 @@ if (!is.null(mds$cmdscale.out)) {
     colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
     mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
 } else {
-    mds <- data.frame(names = colnames(post),
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
                       MDS1 = mds$x,
                       MDS2 = mds$y, var.explained = mds$var.explained)
 }
 
 # mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
 
-mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
-
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
 ```
 
 ```{r, fig.width = 8, fig.height = 4, results = 'asis'}
@@ -1216,7 +1305,26 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=
 
 
 ```{r}
-saveRDS(object = SingleCellExperiment(list(logcpms = pre),
+
+pre_counts <- cbind(assay(d, 'counts')[dict$armor,],
+                    assay(abud, 'counts')[dict$recount,],
+                    assay(trem, 'counts')[dict$armor,],
+                    assay(mc, 'counts')[dict$recount,])
+
+pre_counts <- pre_counts[,colnames(pre)]
+
+pre_cpms <- edgeR::cpm(pre_counts,
+                       log = FALSE, 
+                       prior.count = 2)
+
+rownames(mds) <- mds[,1]
+
+mds <- mds[colnames(pre_counts),]
+
+
+saveRDS(object = SingleCellExperiment(list(logcpms = pre,
+                                           counts = pre_counts,
+                                           cpms = pre_cpms),
                      colData = data.frame(meta, row.names  = meta$names),
                      rowData = rowData(d)[dict$armor,],
                      metadata = list(study = "Villani, Abud, McQuade"),
@@ -1670,7 +1778,6 @@ saveRDS(list(cameraRes = camera_res,
 
 # Differential expression: mutants vs 28-days-old WTs 
 
-## Filter data to remove WTs older than 28 days
 
 ```{r}
 sg <- sg[,colData(sg)$timepoint == 28]
@@ -2061,16 +2168,6 @@ if (is(camera_res, "data.frame")) {
     }
 }
 ```
-
-
-
-# iSEE instances and data objects
-
-
-```{r, results = 'asis'}
-
-```
-
 
 
 # Timestamp
