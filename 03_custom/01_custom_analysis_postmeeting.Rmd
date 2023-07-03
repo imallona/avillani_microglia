@@ -262,6 +262,7 @@ d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_
 
 ```{r}
 
+
 logcpms <- assay(d, "logcpm")
 mds <- limma::plotMDS(logcpms, top = 500, labels = NULL, pch = NULL,
                       cex = 1, dim.plot = c(1, 2), ndim = 7,
@@ -290,7 +291,7 @@ Multidimensional scaling (MDS) plots samples on a two-dimensional scatterplot so
      
 ```{r, fig.width = 10, fig.height = 4, results = 'asis'}
 
-for (item in c('treatment', 'timepoint', 'names', 'timepoint')) {
+for (item in c('treatment', 'timepoint', 'names')) {
     cat('#### ', item, '\n\n')
     print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
           geom_point(size=3) +
@@ -336,6 +337,8 @@ for (item in c('treatment', 'timepoint', 'names', 'timepoint')) {
 
 
 ```{r}
+assay(d, 'cpms') <- cpm(d)
+
 saveRDS(d, file = 'ambra_villani_only_sce.rds')
 ```
 
@@ -393,6 +396,8 @@ dict <- merge(dict, rowData(abud)[rowData(abud)$unversioned_gene_id %in% shared,
                                   c('unversioned_gene_id', 'gene_id')],
               by = 'unversioned_gene_id')
 colnames(dict)[3] <- 'recount'
+
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
 ```
 
 
@@ -545,7 +550,7 @@ rownames(meta) <- meta$names
 tmp2 <- meta[colnames(tmp$counts),]
    
 
-tmp$cpms <- edgeR::cpm(tmp$counts, log = TRUE, prior.count = 2)
+tmp$cpms <- edgeR::cpm(tmp$counts, log = FALSE, prior.count = 2)
 
 rownames(mds) <- mds[,1]
 
@@ -997,6 +1002,8 @@ dict <- data.frame(unversioned_gene_id = shared,
 dict <- merge(dict, rowData(mc)[rowData(mc)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
               by = 'unversioned_gene_id')
 colnames(dict)[3] <- 'recount'
+
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
 ```
 
 <!-- ### Correlations -->
@@ -1320,7 +1327,6 @@ pre_cpms <- edgeR::cpm(pre_counts,
 rownames(mds) <- mds[,1]
 
 mds <- mds[colnames(pre_counts),]
-
 
 saveRDS(object = SingleCellExperiment(list(logcpms = pre,
                                            counts = pre_counts,
@@ -2167,6 +2173,28 @@ if (is(camera_res, "data.frame")) {
         
     }
 }
+```
+
+
+# Consistency check
+
+```{r}
+a0 <- readRDS('ambra_villani_only_sce.rds')
+a1 <- readRDS('villani_plus_abud_sce.rds')
+a2 <- readRDS('all_data_sce.rds')
+
+set.seed(54)
+genes <- sample(rownames(a0), 10, replace = FALSE)
+id <- '20220504.B-TREM2-A1_2_R1'
+
+stopifnot(all(assay(a0, 'logcpm')[genes,id] == assay(a1, 'logcpms')[genes,id]) )
+stopifnot(all(assay(a0, 'logcpm')[genes,id] == assay(a2, 'logcpms')[genes,id]) )
+stopifnot(all(assay(a0, 'counts')[genes,id] == assay(a1, 'counts')[genes,id]) )
+stopifnot(all(assay(a0, 'counts')[genes,id] == assay(a2, 'counts')[genes,id]) )
+
+## stopifnot(all(assay(a0, 'cpms')[genes,id] == assay(a1, 'cpms')[genes,id]) )
+## stopifnot(all(assay(a0, 'cpms')[genes,id] == assay(a2, 'cpms')[genes,id]))
+print('passed')
 ```
 
 
