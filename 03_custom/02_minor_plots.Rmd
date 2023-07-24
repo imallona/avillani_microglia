@@ -1,0 +1,166 @@
+---
+title: "Ambra Villani's microglia RNA-seq, custom plots"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+
+
+```{r warning = FALSE, message = FALSE}
+
+library(ggplot2)
+library(SingleCellExperiment)
+library(Cairo)
+library(scater)
+```
+
+
+```{r}
+## render on error
+knitr::knit_hooks$set(error = function(x, options) {
+    knitr::knit_exit()  
+})
+```
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = FALSE,
+                      include = TRUE,
+                      fig.path = "plots_custom/",
+                      dev = c('svg', "png"),
+                     cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+## options(bitmapType='cairo')
+```
+
+
+# Aim
+
+```
+Plot logCPMs, shared Y axis
+
+ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000095970.17__TREM2
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000134955.12__SLC37A2
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13
+
+Shorter id with only the gene symbol (P2RY12)
+Colors (color code taken from Affinity photo, RGB Hex):
+WT #19A500
+SLC (both mut) #FF2600
+TREM2 #0DCAF2
+
+```
+
+# Note
+
+To be knitted with `/usr/bin/R`
+
+# Plot custom logCPMs {.tabset .tabset-pills}
+
+## Symbol depicts timepoint
+
+
+```{r}
+se <- readRDS('ambra_villani_only_sce.rds')
+
+
+colData(se)$mutation <- factor(colData(se)$mutation, levels = c('WT', 'Slc37a2', 'TREM2'))
+
+
+targets <- read.table(text='ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000095970.17__TREM2
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000134955.12__SLC37A2
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13')$V1
+
+targets_short <- sapply(strsplit(targets, '__'), function(x) return(x[2]))
+cols <- c('WT' = '#19A500',
+          'Slc37a2' = '#FF2600',
+          'TREM2' = '#0DCAF2')
+```
+
+```{r, fig.width = 6.1, fig.height = 4}
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "timepoint",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols) +
+    labs(shape = 'timepoint') 
+```
+
+## Symbol depicts replicate
+
+
+```{r, fig.width = 7, fig.height = 4}
+
+colData(se)$replicate <- colData(se)$treatment
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "replicate",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols)
+
+```
+
+
+# Trace
+
+```{r}
+sessionInfo()
+```
+
