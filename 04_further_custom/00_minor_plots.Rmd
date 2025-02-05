@@ -1,0 +1,340 @@
+---
+title: "Ambra Villani's microglia RNA-seq, custom plots"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+
+
+```{r warning = FALSE, message = FALSE}
+
+library(ggplot2)
+library(SingleCellExperiment)
+library(Cairo)
+library(scater)
+library(iSEE)
+library(ComplexHeatmap)
+
+## options(bitmapType="cairo")
+```
+
+```{r}
+## render on error
+knitr::knit_hooks$set(error = function(x, options) {
+    knitr::knit_exit()  
+})
+```
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = FALSE,
+                      include = TRUE,
+                      fig.path = "plots_custom/",
+                      dev = c('svg', "png"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+## options(bitmapType='cairo')
+```
+
+
+# Aim
+
+Custom re-plotting, by Ambra:
+
+<details>
+
+```
+multiple genes on the X axis (list below) keeping only the short name of the gene and expression level on the Y axes
+
+I would like to remove from this plot the mutant data, hence only showing the WT. 
+
+And maybe one version with a different symbol for the timepoint (as done before), and another one without making a difference among timepoints. 
+
+In my figures at the moment the WT is green (#33CC66).
+
+It would be great if you could again export this as vectorial for me to be able to do small edits.
+
+ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000095970.17__TREM2
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000134955.12__SLC37A2
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13
+
+Shorter id with only the gene symbol (P2RY12)
+```
+
+</details>
+
+# Note
+
+To be knitted with `/usr/bin/R`
+
+# Plot custom logCPMs {.tabset .tabset-pills}
+
+## Symbol depicts timepoint
+
+
+```{r}
+se <- readRDS('../03_custom/ambra_villani_only_sce.rds')
+
+## remove mutated
+
+se <- se[,se$mutation == 'WT']
+
+targets <- read.table(text='ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000095970.17__TREM2
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000134955.12__SLC37A2
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13')$V1
+
+targets_short <- sapply(strsplit(targets, '__'), function(x) return(x[2]))
+cols <- c('WT' = '#33CC66')
+```
+
+```{r bytimepoint, fig.width = 6.1, fig.height = 4}
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "timepoint",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols) +
+    labs(shape = 'timepoint') 
+```
+
+## Symbol depicts replicate
+
+
+```{r byreplicate, fig.width = 7, fig.height = 4}
+
+colData(se)$replicate <- colData(se)$treatment
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "replicate",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols)
+
+```
+
+## Heatmap
+
+Following Ambra's:
+
+<details>
+
+```
+I have also done other plots (a MDS and a heatmap). I am quite happy with the result, but especially the heatmap could be improvable (I would like to change the order of the samples, remove the mutants). Do you know if I can do that in iSEE, or I would need you for that? I attach the resulting heatmap and the corresponding code for that (ipsc_HPC_MG_clustered).
+```
+</details>
+
+Using her code from iSEE (thanks!!). The sce the version with Abud; md5summed with penticton to make sure they're aligned. They are.
+
+
+```{r}
+
+se <- readRDS('../03_custom/villani_plus_abud_sce.rds')
+
+
+## remove mutants
+se <- se[,se$treatment %in% c( "iPSC_MG",
+            "iPSC_MG_(Abud)",
+            "iHPC_(Abud)",         
+            "iPSC_(Abud)",
+            "CD14_M_(Abud)",
+            "CD16_M_(Abud)",
+            "Fetal_MG_(Abud)",
+            "Adult_MG_(Abud)",
+            "Blood_DC_(Abud)")]
+## The following list of commands will generate the plots created in iSEE
+## Copy them into a script or an R session containing your SingleCellExperiment.
+## All commands below refer to your SingleCellExperiment object as `se`.
+
+colormap <- ExperimentColorMap()
+colormap <- synchronizeAssays(colormap, se)
+all_contents <- list()
+
+################################################################################
+# Defining brushes
+################################################################################
+
+all_active <- list()
+all_active[['ReducedDimensionPlot1']] <- list()
+all_active[['FeatureAssayPlot1']] <- list()
+
+################################################################################
+## Reduced dimension plot 1
+################################################################################
+
+
+red.dim <- reducedDim(se, "mds");
+plot.data <- data.frame(X=red.dim[, 1], Y=red.dim[, 2], row.names=colnames(se));
+
+# Avoid visual biases from default ordering by shuffling the points
+set.seed(44);
+plot.data <- plot.data[sample(nrow(plot.data)),,drop=FALSE];
+
+dot.plot <- ggplot() +
+    geom_point(aes(x=X, y=Y), alpha=1, plot.data, color='#000000', size=1) +
+    labs(x="Dimension 1", y="Dimension 2", title="mds") +
+    coord_cartesian(xlim=range(plot.data$X, na.rm=TRUE),
+        ylim=range(plot.data$Y, na.rm=TRUE), expand=TRUE) +
+    theme_bw() +
+    theme(legend.position='bottom', legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+            axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12))
+
+## Saving data for transmission
+all_contents[['ReducedDimensionPlot1']] <- plot.data
+
+################################################################################
+## Complex heatmap 1
+################################################################################
+
+
+.chosen.rows <- c("ENSG00000204531.21__POU5F1", "ENSG00000111704.11__NANOG", "ENSG00000156574.10__NODAL", 
+    "ENSG00000241186.10__TDGF1", "ENSG00000174720.18__LARP7", "ENSG00000156925.12__ZIC3", 
+    "ENSG00000133980.5__VRTN", "ENSG00000136110.13__CNMD", "ENSG00000147869.5__CER1", 
+    "ENSG00000184344.4__GDF3", "ENSG00000121570.13__DPPA4", "ENSG00000240563.2__L1TD1", 
+    "ENSG00000069482.7__GAL", "ENSG00000147601.15__TERF1", "ENSG00000126010.6__GRPR", 
+    "ENSG00000143768.13__LEFTY2", "ENSG00000086475.15__SEPHS1", "ENSG00000141682.12__PMAIP1", 
+    "ENSG00000095002.15__MSH2", "ENSG00000171634.19__BPTF", "ENSG00000132330.18__SCLY", 
+    "ENSG00000144401.14__METTL21A", "ENSG00000111752.11__PHC1", "ENSG00000174059.17__CD34", 
+    "ENSG00000081237.21__PTPRC", "ENSG00000197471.12__SPN", "ENSG00000169313.10__P2RY12", 
+    "ENSG00000204472.13__AIF1", "ENSG00000066336.12__SPI1", "ENSG00000183160.9__TMEM119", 
+    "ENSG00000095970.17__TREM2", "ENSG00000169896.18__ITGAM", "ENSG00000130203.10__APOE", 
+    "ENSG00000153208.18__MERTK", "ENSG00000082781.12__ITGB5", "ENSG00000168329.14__CX3CR1", 
+    "ENSG00000106799.14__TGFBR1", "ENSG00000184500.16__PROS1", "ENSG00000171659.16__GPR34", 
+    "ENSG00000134508.13__CABLES1", "ENSG00000123095.6__BHLHE41", "ENSG00000116774.12__OLFML3", 
+    "ENSG00000137491.15__SLCO2B1", "ENSG00000092068.21__SLC7A8", "ENSG00000112033.14__PPARD", 
+    "ENSG00000100122.7__CRYBB1", "ENSG00000103066.13__PLA2G15", "ENSG00000117984.15__CTSD", 
+    "ENSG00000135838.14__NPL", "ENSG00000134575.13__ACP2", "ENSG00000135047.16__CTSL", 
+    "ENSG00000135124.16__P2RX4", "ENSG00000100997.20__ABHD12", "ENSG00000100985.7__MMP9", 
+    "ENSG00000108691.10__CCL2", "ENSG00000133048.13__CHI3L1", "ENSG00000106991.14__ENG", 
+    "ENSG00000159189.13__C1QC", "ENSG00000173369.18__C1QB", "ENSG00000173372.18__C1QA", 
+    "ENSG00000151117.9__TMEM86A", "ENSG00000163106.11__HPGDS", "ENSG00000282608.2__ADORA3", 
+    "ENSG00000143344.16__RGL1", "ENSG00000153071.15__DAB2", "ENSG00000275302.2__CCL4", 
+    "ENSG00000010327.10__STAB1", "ENSG00000124225.16__PMEPA1", "ENSG00000115008.6__IL1A", 
+    "ENSG00000107719.10__PALD1", "ENSG00000167601.12__AXL", "ENSG00000244405.8__ETV5", 
+    "ENSG00000139572.4__GPR84", "ENSG00000171631.16__P2RY6", "ENSG00000112486.18__CCR6", 
+    "ENSG00000205336.14__ADGRG1", "ENSG00000213316.10__LTC4S", "ENSG00000148908.15__RGS10", 
+    "ENSG00000159216.19__RUNX1", "ENSG00000182578.14__CSF1R", "ENSG00000183087.15__GAS6", 
+    "ENSG00000105383.15__CD33", "ENSG00000120738.8__EGR1", "ENSG00000064687.13__ABCA7", 
+    "ENSG00000085514.16__PILRA", "ENSG00000174837.15__ADGRE1", "ENSG00000163464.8__CXCR1", 
+    "ENSG00000140678.17__ITGAX", "ENSG00000175445.17__LPL");
+.chosen.columns <- colnames(se);
+plot.data <- assay(se, "logcpms")[.chosen.rows, .chosen.columns, drop=FALSE]
+plot.data <- as.matrix(plot.data);
+
+plot.data <- plot.data - rowMeans(plot.data)
+plot.data <- plot.data / apply(plot.data, 1, sd)
+
+.assay_colors <- c("blue", "white", "red")
+.assay_colors <- circlize::colorRamp2(breaks = c(-3.73423928357544, 0, 3.44073249010621), colors = .assay_colors)
+
+# Keep all samples to compute the full range of continuous annotations
+.column_data <- colData(se)[, c("origin", "treatment"), drop=FALSE]
+
+.column_col <- list()
+
+.column_data[["origin"]] <- factor(.column_data[["origin"]]);
+.color_values <- .column_data[["origin"]]
+.color_values <- setdiff(unique(.color_values), NA)
+.col_colors <- colDataColorMap(colormap, "origin", discrete=TRUE)(length(.color_values))
+names(.col_colors) <- unique(.color_values)
+.column_col[["origin"]] <- .col_colors
+
+.column_data[["treatment"]] <- factor(.column_data[["treatment"]]);
+.color_values <- .column_data[["treatment"]]
+.color_values <- setdiff(unique(.color_values), NA)
+.col_colors <- colDataColorMap(colormap, "treatment", discrete=TRUE)(length(.color_values))
+names(.col_colors) <- unique(.color_values)
+.column_col[["treatment"]] <- .col_colors
+
+.column_data <- .column_data[colnames(plot.data), , drop=FALSE]
+.column_data <- as.data.frame(.column_data, optional=TRUE)
+.column_annot_order <- order(.column_data[["origin"]], .column_data[["treatment"]])
+.column_data <- .column_data[.column_annot_order, , drop=FALSE]
+plot.data <- plot.data[, .column_annot_order, drop=FALSE]
+.column_annot <- ComplexHeatmap::columnAnnotation(df=.column_data, col=.column_col, annotation_legend_param=list(direction="vertical"))
+```
+
+Shortened gene names (not requested but):
+
+```{r}
+rownames(plot.data) <- sapply(strsplit(rownames(plot.data), '__'), function(x) return(x[2]))
+
+head(rownames(plot.data))
+hm <- ComplexHeatmap::Heatmap(matrix=plot.data, col=.assay_colors,
+    top_annotation=.column_annot, cluster_rows=TRUE,
+    clustering_distance_rows="spearman", clustering_method_rows="ward.D2",
+    cluster_columns=FALSE, name="logcpms\n(centered, scaled)",
+    show_row_names=TRUE, show_column_names=FALSE,
+    heatmap_legend_param=list(direction="vertical"))
+
+```
+
+
+```{r heatmap, fig.width = 10, fig.height = 16, results = 'as-is'}
+ComplexHeatmap::draw(hm, heatmap_legend_side="right", annotation_legend_side="right")
+
+# Saving data for transmission
+
+
+```
+
+# Trace
+
+```{r}
+sessionInfo()
+```
+
