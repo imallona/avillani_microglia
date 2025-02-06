@@ -438,14 +438,92 @@ hm <- ComplexHeatmap::Heatmap(matrix=plot.data, col=.assay_colors,
 ```
 
 
-```{r heatmap_nomutants, fig.width = 10, fig.height = 16, results = 'as-is'}
+```{r heatmap_nomutants, fig.width = 20, fig.height = 16, results = 'as-is'}
+ComplexHeatmap::draw(hm, heatmap_legend_side="right", annotation_legend_side="right")
+
+```
+
+## Heatmap without mutants plotting logCPMs - not scaling nor centering
+
+Because the scaling and centering, even if standard in the field, force heatmap cells to go blue -> red (rowwise). Adding this a a sanity check to be aware of actual logCPMs -hoping it helps for interpretation.
+
+
+
+```{r}
+.chosen.columns <- colnames(se);
+plot.data <- assay(se, "logcpms")[.chosen.rows, .chosen.columns, drop=FALSE]
+plot.data <- as.matrix(plot.data);
+
+## no scaling!!
+## plot.data <- plot.data - rowMeans(plot.data)
+## plot.data <- plot.data / apply(plot.data, 1, sd)
+
+.assay_colors <- c("blue", "white", "red")
+## .assay_colors <- circlize::colorRamp2(breaks = c(-3.73423928357544, 0, 3.44073249010621), colors = .assay_colors)
+
+# Keep all samples to compute the full range of continuous annotations
+.column_data <- colData(se)[, c("origin", "treatment"), drop=FALSE]
+
+.column_col <- list()
+
+.column_data[["origin"]] <- factor(.column_data[["origin"]]);
+.color_values <- .column_data[["origin"]]
+.color_values <- setdiff(unique(.color_values), NA)
+.col_colors <- colDataColorMap(colormap, "origin", discrete=TRUE)(length(.color_values))
+names(.col_colors) <- unique(.color_values)
+.column_col[["origin"]] <- .col_colors
+
+.column_data[["treatment"]] <- factor(.column_data[["treatment"]]);
+.color_values <- .column_data[["treatment"]]
+.color_values <- setdiff(unique(.color_values), NA)
+.col_colors <- colDataColorMap(colormap, "treatment", discrete=TRUE)(length(.color_values))
+names(.col_colors) <- unique(.color_values)
+.column_col[["treatment"]] <- .col_colors
+
+.column_data <- .column_data[colnames(plot.data), , drop=FALSE]
+.column_data <- as.data.frame(.column_data, optional=TRUE)
+.column_annot_order <- order(.column_data[["origin"]], .column_data[["treatment"]])
+.column_data <- .column_data[.column_annot_order, , drop=FALSE]
+plot.data <- plot.data[, .column_annot_order, drop=FALSE]
+.column_annot <- ComplexHeatmap::columnAnnotation(df=.column_data, col=.column_col, annotation_legend_param=list(direction="vertical"))
+```
+
+```{r}
+
+rownames(plot.data) <- sapply(strsplit(rownames(plot.data), '__'), function(x) return(x[2]))
+plot.data <- plot.data[c(pluri, hpc, micro),]
+row.split <- data.frame(gene = c(pluri, hpc, micro),
+                        category = NA)
+row.split[row.split$gene %in% pluri, 'category'] <- 'Pluripotency'
+row.split[row.split$gene %in% hpc, 'category'] <- 'HPC'
+row.split[row.split$gene %in% micro, 'category'] <- 'Microglia'
+
+
+rowha <- rowAnnotation(signature = row.split$category,
+                       show_annotation_name = TRUE)
+
+hm <- ComplexHeatmap::Heatmap(matrix=plot.data, col=.assay_colors,
+                              top_annotation=.column_annot, cluster_rows=TRUE,
+                              split = as.factor(row.split$category),
+                              left_annotation = rowha,
+                              clustering_distance_rows="spearman", clustering_method_rows="ward.D2",
+                              cluster_columns=FALSE, name="logCPMs",
+                              show_row_names=TRUE, show_column_names=TRUE,
+                              heatmap_legend_param=list(direction="vertical"))
+
+```
+
+
+```{r heatmap_nomutants_no_scaling, fig.width = 20, fig.height = 16, results = 'as-is'}
 ComplexHeatmap::draw(hm, heatmap_legend_side="right", annotation_legend_side="right")
 
 ```
 
 
+
 ## Heatmap with mutants
 
+With logCPM scaling and centering again.
 
 ```{r}
 se <- readRDS('../03_custom/villani_plus_abud_sce.rds')
@@ -589,7 +667,7 @@ hm <- ComplexHeatmap::Heatmap(matrix=plot.data, col=.assay_colors,
 ```
 
 
-```{r heatmap_mutants, fig.width = 12, fig.height = 16, results = 'as-is'}
+```{r heatmap_mutants, fig.width = 22, fig.height = 16, results = 'as-is'}
 ComplexHeatmap::draw(hm, heatmap_legend_side="right", annotation_legend_side="right")
 
 ```
