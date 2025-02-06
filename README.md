@@ -1,18 +1,20 @@
 ## Aim
 
-Bulk RNA-seq, Ambra Villani's in-house microglia iPSC-derived cultures (and engineered Slc37a2 and TREM2) plus public bulk RBNA-seq data.
+Bulk RNA-seq, Ambra Villani's in-house microglia iPSC-derived cultures (and engineered Slc37a2 and TREM2) plus public bulk RNA-seq data.
 
 ## Methods
 
-Inhouse RNA-seq raw reads were processed with ARMOR (https://pmc.ncbi.nlm.nih.gov/articles/PMC6643886/) and Abud's data retrieved using recount3 (cite) from SRP092075. Reads were aligned and counted using the human genome GRCh38 assembly and Gencode release 43 annotation with salmon v1.4.0 and with STAR 2.7.7a. We modelled the salmon-generated count data with quasi-likelihood (QL) negative binomial generalized log-linear models and ran differential expression analysis with edgeR v3.36.0. Batch correction was performed using ComBat from the R package `sva` v3.42.0 using the origin (Abud's or inhouse) as batch.
+Inhouse RNA-seq and McQuade's TREM (PMID 31088905) raw reads were processed with ARMOR (PMC6643886). Reads were aligned and counted using the human genome GRCh38 assembly and Gencode release 43 annotation with salmon v1.4.0 and with STAR 2.7.7a. We downloaded Abud's and iPSCs data from the Sequence Read Archive (SRA) accessions SRP092075 and SRP155574, respectively, using recount3 (PMID 34844637) and GRCh38 as reference genome and Gencode's annotation. We modelled the salmon-generated inhouse count data with quasi-likelihood (QL) negative binomial generalized log-linear models and ran differential expression analysis with edgeR v3.36.0 using salmon outputs. 
 
-Gene expression plots depict logCPMs as calculated by edgeR's `cpm(assay(x, 'counts'), log = TRUE,  prior.count = 2)` or scaled and centered logCPMs, as depicted within figure legends.
+We generated multi-dimensional scaling (MDS) plots based on normalized count data using edgeR v3.36.0. Briefly, MDS plots depict similarities between samples (including replicates and batches) in an unsupervised manner, depicting the two leading fold-change dimensions which explain the largest proportion of variation in gene expression across samples. Batch correction was performed using ComBat from the R package `sva` v3.42.0 using the origin (Abud's or inhouse) as batch.
 
-Geneset enrichment analysis were run using camera from limma v3.50.3 (PMID PMC3458527) and mSigDB annotations on differentially expressed genes as reported by edgeR. Selected genesets included: C2, curated gene sets from online pathway databases, publications in PubMed, and knowledge of domain experts; C5, Gene Ontology; and C8, cell type signatures.
+Gene expression plots depict logCPMs as calculated by edgeR's `cpm(assay(x, 'counts'), log = TRUE,  prior.count = 2)` or scaled and centered logCPMs, as reported in figure legends.
+
+Geneset enrichment analysis were run using camera from limma v3.50.3 (PMC3458527) and mSigDB annotations on differentially expressed genes as reported by edgeR. Selected genesets included: C2, curated gene sets from online pathway databases, publications in PubMed, and knowledge of domain experts; C5, Gene Ontology; and C8, cell type signatures.
 
 ### Note on methods
 
-We processed McQuade's datasets - not sure these are part of the paper.
+We processed McQuade's datasets - not sure these are part of the paper, **remove references to McQuade's if not**.
 
 ## Data
 
