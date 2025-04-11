@@ -1,0 +1,230 @@
+---
+title: "Ambra Villani's microglia RNA-seq, custom plots on 11th Apr 2025"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+
+
+```{r warning = FALSE, message = FALSE}
+
+library(ggplot2)
+library(SingleCellExperiment)
+library(Cairo)
+library(scater)
+library(iSEE)
+library(ComplexHeatmap)
+
+## options(bitmapType="cairo")
+```
+
+```{r}
+## render on error
+knitr::knit_hooks$set(error = function(x, options) {
+    knitr::knit_exit()  
+})
+```
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = FALSE,
+                      include = TRUE,
+                      fig.path = "other_plots/",
+                      dev = c('svg', "png"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+## options(bitmapType='cairo')
+```
+
+# Note
+
+To be knitted with `/usr/bin/R`
+
+
+# Aim 1 {.tabset .tabset-pills}
+
+Custom re-plotting, by Ambra:
+
+<details>
+
+```
+Plot you did last time (WT data, by replicate, also attached here) with the following edits:
+Remove gene Slc37a2
+Show only the time points 34 and 38 (remove 28)
+```
+
+</details>
+
+
+## Symbol depicts timepoint
+
+
+```{r}
+se <- readRDS('../03_custom/ambra_villani_only_sce.rds')
+
+
+se <- se[,se$mutation == 'WT']
+se <- se[,se$timepoint %in% c(34, 38)]
+
+targets <- read.table(text='ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000095970.17__TREM2
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13')$V1
+
+targets_short <- sapply(strsplit(targets, '__'), function(x) return(x[2]))
+cols <- c('WT' = '#33CC66')
+```
+
+```{r bytimepoint_wt, fig.width = 6.1, fig.height = 4}
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "timepoint",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols) +
+    labs(shape = 'timepoint') 
+```
+
+## Symbol depicts replicate
+
+
+```{r byreplicate_wt, fig.width = 7, fig.height = 4}
+
+colData(se)$replicate <- colData(se)$treatment
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "replicate",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols)
+
+```
+
+
+# Aim 2 {.tabset .tabset-pills}
+
+Following Ambra's:
+
+<details>
+
+```
+A new plot Including:
+ - Backgrounds: WT, Slc37a2, TREM2
+- Show for all only time point 28 (not used for the first plot)
+- Use the same list of genes as the one attached here (including Slc37a2), following this order:
+  - Position 1: Slc37a2
+  - Position 2: TREM2
+  - The position of the next genes doesn’t matter!
+```
+</details>
+
+
+## Symbols depict timepoint
+
+
+```{r}
+se <- readRDS('../03_custom/ambra_villani_only_sce.rds')
+
+se <- se[,se$timepoint == 28]
+
+targets <- read.table(text='
+ENSG00000134955.12__SLC37A2
+ENSG00000095970.17__TREM2
+ENSG00000169313.10__P2RY12
+ENSG00000066336.12__SPI1
+ENSG00000183160.9__TMEM119
+ENSG00000169896.18__ITGAM
+ENSG00000130203.10__APOE
+ENSG00000153208.18__MERTK
+ENSG00000168329.14__CX3CR1
+ENSG00000159189.13__C1QC
+ENSG00000173369.18__C1QB
+ENSG00000173372.18__C1QA
+ENSG00000171631.16__P2RY6
+ENSG00000183087.15__GAS6
+ENSG00000175445.17__LPL
+ENSG00000204472.13__AIF1
+ENSG00000141458.13__NPC1
+ENSG00000119655.11__NPC2
+ENSG00000181631.7__P2RY13')$V1
+
+targets_short <- sapply(strsplit(targets, '__'), function(x) return(x[2]))
+cols <- c('WT' = '#33CC66', 'Slc37a2' = '#E69F00', 'TREM2' = '#0072B2')
+```
+
+
+```{r bytimepoint_mutants, fig.width = 6.1, fig.height = 4}
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "timepoint",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols) +
+    labs(shape = 'timepoint') 
+```
+
+## Symbol depicts replicate
+
+
+```{r byreplicate_mutants, fig.width = 7, fig.height = 4}
+
+colData(se)$replicate <- colData(se)$treatment
+
+foo <- scater::plotExpression(se, targets, 
+               shape_by = "replicate",
+               colour_by = 'mutation',
+               exprs_values = 'logcpm')
+
+foo +
+    scale_x_discrete(labels = targets_short) +
+    scale_colour_manual(name = 'background', values = cols)
+
+```
+
+
+# Trace
+
+```{r}
+sessionInfo()
+```
+
