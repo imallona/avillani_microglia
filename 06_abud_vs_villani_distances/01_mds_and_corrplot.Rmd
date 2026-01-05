@@ -1,0 +1,211 @@
+---
+title: "Abud vs Villani, after combat - sample to sample correlation"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+this adapts 03_custom/01_custom_analysis_postmeeting.Rmd to get a sample-to-sample (Spearman_ correlation plot of Villani vs Abud, including mutants, after combat correction, and on all genes (not only pluripotecy ones)
+
+```{r warning = FALSE, message = FALSE}
+## .libPaths('/home/imallona/R/R4_bioc314')
+
+library(ggplot2)
+library(SingleCellExperiment)
+## library(corrplot)
+## library(recount3)
+library(ComplexHeatmap)
+## library(circlize)
+library(dplyr)
+library(sva)
+library(limma)
+```
+
+```{r}
+## render on error
+knitr::knit_hooks$set(error = function(x, options) {
+    knitr::knit_exit()  
+})
+```
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = TRUE,
+                      include = TRUE,
+                      fig.path = "plots_post/",
+                      dev = c("png", "svg"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+## options(bitmapType='cairo')
+```
+
+
+
+```{r}
+tmp3 <- readRDS('../03_custom/villani_plus_abud_sce.rds')
+```
+
+Original MDS (batch corrected)
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+mds <- reducedDim(tmp3)
+mds$names <- tmp3$names
+mds <- merge(mds, colData(tmp3), by = 'names')
+rownames(mds) <- mds$names
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1"),
+          y = sprintf("Dim. 2"),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+     scale_color_brewer(palette = "Set3"))
+
+```
+
+Repeat from scratch
+
+
+```{r}
+
+logcpms <- assay(tmp3, "logcpms")
+table(tmp3$origin)
+# parametric adjustment
+combat_abud <- sva::ComBat(dat=logcpms,
+                           batch = tmp3$origin,
+                           mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+mds <- merge(mds, colData(tmp3), by = 'names')
+rownames(mds) <- mds$names
+```
+
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+
+
+```{r}
+## library(SingleCellExperiment)
+## mat <- assay(tmp3, "logcpms")
+mat <- combat_abud
+
+cor_mat <- cor(mat, method = "spearman")
+
+dim(cor_mat)
+
+meta <- as.data.frame(colData(tmp3))
+
+meta$targets <- meta$treatment %in% c('iPSC_MG')
+table(meta$targets)
+## ann_col <- HeatmapAnnotation( df = meta %>% select(treatment) )
+ann_col <- HeatmapAnnotation(
+  df = meta %>% select(treatment, origin, age)
+)
+
+## ann_row <- rowAnnotation( df = meta %>% select(origin) )
+
+
+```
+
+```{r, fig.width = 12, fig.height = 10}
+cor_text_fun <- function(j, i, x, y, width, height, fill) {
+  grid.text(sprintf("%.2f", cor_mat[i, j]),
+            x = x, y = y,
+            gp = gpar(fontsize = 8, col = "black"))
+}
+
+## col_fun <- colorRamp2(
+##   c(0, 1),
+##   c("white", "darkblue")
+## )
+
+col_fun <- colorRampPalette(c("white", "darkblue"))(100)
+
+
+
+Heatmap(
+  cor_mat,
+  name = "Spearman\ncorrelation",
+  col =  col_fun,
+  cluster_rows = TRUE,
+  cluster_columns = TRUE,
+  show_row_dend = TRUE,
+  show_column_dend = TRUE,
+  top_annotation = ann_col,
+  ## left_annotation = ann_row,
+  ## cell_fun = cor_text_fun,
+  rect_gp = gpar(col = "grey90", lwd = 0.5),
+  heatmap_legend_param = list(title = "Correlation")
+)
+
+```
+
+# Timestamp
+
+```{r sessionInfo2, cache = FALSE}
+date()
+sessionInfo()
+## devtools::session_info()
+```

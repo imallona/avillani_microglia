@@ -1,0 +1,2286 @@
+---
+title: "Ambra Villani's microglia RNA-seq"
+author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: kable
+    theme: lumen
+params:
+  seed: 665
+---
+
+
+```{r warning = FALSE, message = FALSE}
+## .libPaths('/home/imallona/R/R4_bioc314')
+
+library(ggplot2)
+## library(EnhancedVolcano)
+## library(iSEE)
+## library(knitr)
+## library(DRIMSeq)
+## library(EnsDb.Hsapiens.v86)
+library(SingleCellExperiment)
+library(corrplot)
+#library(GGally)
+#library(scuttle)
+#library(knitr)
+#library(greybox) # cramer's distance
+#library(viridis)
+#library(regioneR)
+#library(GenomicRanges)
+#library(rtracklayer)
+
+## camera start
+
+## library(dplyr)
+## library(msigdbr)
+## library(CAMERA)
+
+#require(topGO)
+#require(org.Hs.eg.db)
+
+## library("ggVennDiagram")
+library(recount3)
+
+ library(tibble)
+library(dplyr)
+##  library(tidyr)
+library(limma)
+library(edgeR)
+library(sva)
+library(DT)
+## library(reshape2)
+
+
+```
+
+
+```{r edgeR-load-pkg}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(tximport)
+    library(tximeta)
+    library(SingleCellExperiment)
+    library(edgeR)
+    library(ggplot2)
+    library(msigdbr)
+    library(EnhancedVolcano)
+})
+```
+
+
+
+```{r}
+## render on error
+knitr::knit_hooks$set(error = function(x, options) {
+    knitr::knit_exit()  
+})
+```
+
+```{r}
+knitr::opts_chunk$set(fig.width = 5,
+                      fig.height = 5,
+                      cache = TRUE,
+                      include = TRUE,
+                      fig.path = "plots_post/",
+                      dev = c("png", "svg"),
+                      cache.lazy = FALSE,
+                      warning = TRUE,
+                      message = TRUE)
+
+## plan("multiprocess", workers = NTHREADS)
+## options(future.globals.maxSize= 1.4e9)
+
+## options(bitmapType='cairo')
+```
+
+
+# Aim
+
+
+> Compare to published datasets (see block1, 2 and 3). The highest priority,m is to compare to those in block 1 (from Abud et al.).
+
+Methods: We processed our RNA-seq, McQuade's TREM raw reads with ARMOR (PMID 31088905). Briefly, reads were aligned and counted to the human genome (GRCh38 assembly and Gencode release 43) with salmon v1.4.0 and with STAR 2.7.7a. Differential expression analysis was carried out with edgeR v3.36.0 using salmon outputs. 
+
+We downloaded Abud's and McQuade's iPSCs data from the Sequence Read Archive (SRA) accessions SRP092075 and SRP155574, respectively, using recount3 (PMID 34844637) and GRCh38 as reference genome and Gencode's annotation. 
+
+Results: We detect noticeable age effects (within Villani's WTs), relatively weaker mutation effects (within Villani's mutant), and batch effects when comparing to Abud's, McQuade's data. The MDS plot after batch correction of Villani's WT + Villani's mutants + Abud's looks the best; the same MDS without Villani's mutants not so.
+
+See `Comparison of Villani's, Abud's, McQuade's data`.
+
+> Do they express typical microglial genes (I have a list)
+
+Methods: We generated multi-dimensional scaling (MDS) plots based on normalized count data using edgeR v3.36.0. Briefly, MDS plots depict similarities between samples (including replicates and batches) in an unsupervised manner, depicting the two leading fold-change dimensions which explain the largest proportion of variation in gene expression across samples.
+
+Results: Please use the iSEE deployments:
+
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_only_2023/
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_plus_abud_2023/
+- http://imlspenticton.uzh.ch:3740/ambra_villani_microglia_plus_abud_and_mcquade_2023/
+
+Mind the iSEE deployments show 'counts', 'CPMs' and 'logCPMs'. My recommendation is to check 'CPMs' or 'logCPMs', so readouts are already normalized/don't depend on sequencing depth. CPMs and logCPMs were calculated with `edgeR::cpm` and with `prior.count = 2`.
+
+
+> They express genes relevant in neurodegenerative disorders (I have a list)
+
+Results: See the iSEE deployments above.
+
+> 1. The different mutants still becomes microglia (add to the MDS?)
+>        a. Slc37a2 I have 2 different mutants (clones) same gene (but different mutation)
+>        b. TREM2 I just have 1 mutant
+
+>2. They are indeed mutants 
+>        a. RNA level reduced compared to WT. As WT for comparison use the 2 from av165 (same round of differentiation)
+>        b. Alignment to WT sequence?
+
+Results: please browse the STAR BAM files.
+
+> 3. The TREM2 mutant has the typical signature of microglia missing this gene according to literature
+>        a. Compare to McQuade TREM2 KO (highlighted in yellow in the spreadsheet)
+>        b. Lipid metabolism affected (expected)
+
+
+Methods: We ran a geneset enrichment analysis using `camera` from limma v3.50.3 (PMID PMC3458527) and [mSigDB](http://software.broadinstitute.org/gsea/msigdb) annotations on differentially expressed genes. Selected genesets included:
+
+<!-- - H, hallmark gene sets  -->
+<!-- - C1, positional gene sets (cytobands) -->
+- C2, curated gene sets from online pathway databases, publications in PubMed, and knowledge of domain experts
+<!-- - C3, regulatory target gene sets based on gene target predictions for microRNA seed sequences and predicted transcription factor binding sites -->
+- C5, Gene Ontology
+- C8, cell type signatures
+
+Results: please check sections named `Geneset analysis`.
+
+# Notes
+
+Plots in PNG and SVG format <a href="plots_post/">can be browsed and downloaded here</a>.
+
+# Comparison of Villani's, Abud's, McQuade's data
+
+## Metadata
+
+```{r}
+options(ggplot2.discrete.fill    = function() scale_fill_brewer(palette = "Set3"))
+options(ggplot2.discrete.color    = function() scale_color_brewer(palette = "Set3"))
+```
+
+```{r}
+meta <- read.csv(text="treatment,names,age
+iPSC_MG_(Abud),SRR4450428,unknown
+iPSC_MG_(Abud),SRR4450429,unknown
+iPSC_MG_(Abud),SRR4450430,unknown
+iPSC_MG_(Abud),SRR4450431,unknown
+iPSC_MG_(Abud),SRR4450432,unknown
+iPSC_MG_(Abud),SRR4450433,unknown
+iHPC_(Abud),SRR4450434,unknown
+iHPC_(Abud),SRR4450435,unknown
+iHPC_(Abud),SRR4450436,unknown
+iPSC_(Abud),SRR4450437,unknown
+iPSC_(Abud),SRR4450438,unknown
+iPSC_(Abud),SRR4450439,unknown
+iPSC_(Abud),SRR4450440,unknown
+CD14_M_(Abud),SRR4450441,unknown
+CD14_M_(Abud),SRR4450442,unknown
+CD14_M_(Abud),SRR4450443,unknown
+CD14_M_(Abud),SRR4450444,unknown
+CD14_M_(Abud),SRR4450445,unknown
+CD16_M_(Abud),SRR4450446,unknown
+CD16_M_(Abud),SRR4450447,unknown
+CD16_M_(Abud),SRR4450448,unknown
+CD16_M_(Abud),SRR4450449,unknown
+Fetal_MG_(Abud),SRR4450450,unknown
+Fetal_MG_(Abud),SRR4450451,unknown
+Fetal_MG_(Abud),SRR4450452,unknown
+Adult_MG_(Abud),SRR4450453,unknown
+Adult_MG_(Abud),SRR4450454,unknown
+Adult_MG_(Abud),SRR4450455,unknown
+Blood_DC_(Abud),SRR4450456,unknown
+Blood_DC_(Abud),SRR4450457,unknown
+Blood_DC_(Abud),SRR4450458,unknown
+iPSC_MG_WT_(McQuade),SRR12608405,unknown
+iPSC_MG_WT_(McQuade),SRR12608406,unknown
+iPSC_MG_WT_(McQuade),SRR12608407,unknown
+iPSC_MG_WT_(McQuade),SRR12608408,unknown
+iPSC_MG_TREM2_KO_(McQuade),SRR12608409,unknown
+iPSC_MG_TREM2_KO_(McQuade),SRR12608410,unknown
+iPSC_MG_TREM2_KO_(McQuade),SRR12608411,unknown
+iPSC_MG_TREM2_KO_(McQuade),SRR12608412,unknown
+iPSC_MG_2.0_(McQuade),SRR7613924,unknown
+iPSC_MG_2.0_(McQuade),SRR7613925,unknown
+iPSC_MG_2.0_(McQuade),SRR7613926,unknown
+iHPC_2.0_(McQuade),SRR8180288,unknown
+iHPC_2.0_(McQuade),SRR8180289,unknown
+iHPC_2.0_(McQuade),SRR8180290,unknown
+iPSC_MG,20220209.A-av111_WT_001_R1,day_34
+iPSC_MG,20220209.A-av111_WT_002_R1,day_34
+iPSC_MG,20220209.A-av111_WT_003_R1,day_34
+iPSC_MG,20220209.A-tw029_WT_2_R1,day_38
+iPSC_MG,20220209.A-tw029_WT_3_R1,day_38
+iPSC_MG,20220504.B-WTC_1_R1,day_28
+iPSC_MG,20220504.B-WTC_2_R1,day_28
+iPSC_MG_Slc37a2_mut1,20220504.B-SLC-EX2B1_1_R1,day_28
+iPSC_MG_Slc37a2_mut1,20220504.B-SLC-EX2B1_2_R1,day_28
+iPSC_MG_Slc37a2_mut2,20220504.B-SLC-EX6C5_1_R1,day_28
+iPSC_MG_Slc37a2_mut2,20220504.B-SLC-EX6C5_2_R1,day_28
+iPSC_MG_TREM2_mut,20220504.B-TREM2-A1_1_R1,day_28
+iPSC_MG_TREM2_mut,20220504.B-TREM2-A1_2_R1,day_28")
+```
+
+```{r}
+meta$origin <- 'Villani'
+
+meta$origin[grepl('Abud', meta$treatment)] <- 'Abud'
+meta$origin[grepl('McQuade', meta$treatment)] <- 'McQuade iPSC'
+meta$origin[grepl('SRR126', meta$names)] <- 'McQuade TREM'
+
+```
+
+Data included in this analysis:
+
+```{r, results = 'asis'}
+(DT::datatable(meta, rownames = FALSE, 
+                extensions = 'Buttons',
+                filter = "none",
+                options = list(pageLength = 5, autowidth = TRUE,
+                           dom = 'Blftip',                           
+                           buttons = c('copy', 'csv', 'excel'))))
+```
+
+
+## Overview of Villani's data {.tabset .tabset-pills}
+
+```{r}
+d <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/shiny_sce.rds')$sce_gene
+
+```
+
+```{r}
+
+
+logcpms <- assay(d, "logcpm")
+mds <- limma::plotMDS(logcpms, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE,
+                      var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = colnames(logcpms),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+mds <- mds %>% 
+    dplyr::full_join(data.frame(colData(d)), by = "names")
+```
+
+### MDS {.tabset .tabset-pills}
+
+
+Multidimensional scaling (MDS) plots samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples.
+     
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+for (item in c('treatment', 'timepoint', 'names')) {
+    cat('#### ', item, '\n\n')
+    print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
+          geom_point(size=3) +
+          labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+               y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+               title= paste("MDS", item)) +
+          coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                          ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+          theme_bw() +
+          labs(color = item) +
+          theme(aspect.ratio=1) +
+          theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+    cat('\n\n')
+
+}
+```
+
+<!-- ### Correlation  {.tabset .tabset-pills} -->
+
+<!-- #### All genes -->
+
+<!-- ```{r, fig.width = 10, fig.height = 10} -->
+<!-- corrplot(cor(logcpms, method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white') -->
+
+
+<!-- ``` -->
+
+<!-- #### Top 500 most variable genes -->
+
+<!-- ```{r, fig.width = 10, fig.height = 10} -->
+<!-- corrplot(cor(logcpms[head(order(rowVars(logcpms), decreasing = TRUE), 500),], method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--          addCoef.col  = 'white', number.cex  =  0.8, order  =  'hclust', diag = TRUE) -->
+
+
+
+
+<!-- ``` -->
+
+
+
+```{r}
+assay(d, 'cpms') <- cpm(d)
+
+saveRDS(d, file = 'ambra_villani_only_sce.rds')
+```
+
+
+## Villani's wildtypes and mutants and Abud's data {.tabset .tabset-pills}
+
+<!-- ### Correlations -->
+
+
+```{r, message = FALSE, warning = FALSE}
+srp <- "SRP092075"
+abud <- recount3::create_rse_manual(
+                    project = srp,
+                    project_home = "data_sources/sra",
+                    organism = "human",
+                    annotation = "gencode_v29",
+                    type = "gene")
+
+assay(abud, "counts") <- transform_counts(abud)
+
+
+```
+
+```{r, eval = TRUE}
+abud <- subset(abud,
+               select = colData(abud)$external_id %in%  meta$names)
+
+## abud_annot <- merge(abud_annot, colData(abud), by.x = 'srr', by.y = 'external_id')
+
+```
+
+
+```{r}
+abudlcpm <- edgeR::cpm(assay(abud, 'counts'),
+                       log = TRUE, 
+                       prior.count = 2)
+
+
+```
+
+```{r}
+## table(rowData(d)$gene_id %in% rowData(abud)$gene_id)
+
+rowData(d)$unversioned_gene_id <- sapply(strsplit(rowData(d)$gene_id, '\\.'), function(x) return(x[[1]]))
+rowData(abud)$unversioned_gene_id <- sapply(strsplit(rowData(abud)$gene_id, '\\.'), function(x) return(x[[1]]))
+
+## table(rowData(d)$unversioned_gene_id %in% rowData(abud)$unversioned_gene_id)
+
+shared <- intersect(rowData(d)$unversioned_gene_id, rowData(abud)$unversioned_gene_id)
+
+dict <- data.frame(unversioned_gene_id = shared,
+                   armor = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+
+dict <- merge(dict, rowData(abud)[rowData(abud)$unversioned_gene_id %in% shared,
+                                  c('unversioned_gene_id', 'gene_id')],
+              by = 'unversioned_gene_id')
+colnames(dict)[3] <- 'recount'
+
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
+```
+
+
+```{r}
+## remove the PAR_Y recount3 which introduce duplicates, i.e.
+
+## dim(dict)
+## print(grep('PAR_Y', dict$recount, value = TRUE))
+
+## dim(dict)
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
+```
+
+
+<!-- ```{r, fig.width = 25, fig.height = 25} -->
+
+<!-- ## dim(cbind(logcpms[dict$armor,], abudlcpm[dict$recount,])) -->
+
+<!-- corrplot(cor(cbind(logcpms[dict$armor,], -->
+<!--                    abudlcpm[dict$recount,]), method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white') -->
+<!-- ``` -->
+
+### MDS before batch correction
+
+```{r, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
+                            abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                  MDS1 = mds$x,
+                  MDS2 = mds$y)
+
+rownames(mds) <- mds$names
+
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+
+mds <- merge(mds, meta, by = 'names')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+                      title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# parametric adjustment
+combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
+                                    abudlcpm[dict$recount,]),
+                           batch = c(rep('ambra', ncol(logcpms)),
+                                       rep('abud', ncol(abudlcpm))),
+                          mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+### MDS after batch correction {.tabset .tabset-pills}
+
+#### Batches
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+#### Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+                      y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+                                  title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+     scale_color_brewer(palette = "Set3"))
+
+```
+
+
+```{r}
+
+
+tmp <- list(logcpms = cbind(logcpms[dict$armor,],
+                            abudlcpm[dict$recount,]),
+            counts = cbind(counts(d)[dict$armor,],
+                           assay(abud, 'raw_counts')[dict$recount,]))
+rownames(meta) <- meta$names
+
+tmp2 <- meta[colnames(tmp$counts),]
+   
+
+tmp$cpms <- edgeR::cpm(tmp$counts, log = FALSE, prior.count = 2)
+
+rownames(mds) <- mds[,1]
+
+mds <- mds[colnames(tmp$counts),]
+
+tmp3 <- SingleCellExperiment(assays = tmp,
+                     colData = data.frame(tmp2),
+                     rowData = rowData(d)[dict$armor,],
+                     metadata = list(study = "Villani, Abud"),
+                     reducedDims = list(mds = mds[,2:3]))
+                     
+saveRDS(object = tmp3,
+        file = 'villani_plus_abud_sce.rds')
+
+rm(tmp, tmp2)
+
+
+
+```
+
+<!-- # Test -->
+
+
+<!-- ```{r} -->
+<!-- se <- tmp3 -->
+<!-- red.dim <- reducedDim(tmp3, "mds"); -->
+
+<!-- plot.data <- data.frame(X=red.dim[, 1], Y=red.dim[, 2], row.names=colnames(se)); -->
+
+<!-- plot.data$ColorBy <- colData(se)[, "names"]; -->
+
+<!-- print(head(plot.data$ColorBy)) -->
+<!-- plot.data[["ColorBy"]] <- factor(plot.data[["ColorBy"]]); -->
+
+<!-- # Avoid visual biases from default ordering by shuffling the points -->
+<!-- set.seed(44); -->
+<!-- plot.data <- plot.data[sample(nrow(plot.data)),,drop=FALSE]; -->
+
+<!-- dot.plot <- ggplot() + -->
+<!--     geom_point(aes(x=X, y=Y, color=ColorBy), alpha=1, plot.data, size=1) + -->
+<!--     labs(x="Dimension 1", y="Dimension 2", color="names", title="mds") + -->
+<!--     coord_cartesian(xlim=range(plot.data$X, na.rm=TRUE), -->
+<!--         ylim=range(plot.data$Y, na.rm=TRUE), expand=TRUE) + -->
+<!--     theme_bw() + -->
+<!--     theme(legend.position='bottom', legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11), -->
+<!--           axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)) -->
+
+
+<!-- print(dot.plot) -->
+
+
+<!-- red.dim <- reducedDim(se, "mds"); -->
+<!-- plot.data <- data.frame(X=red.dim[, 1], Y=red.dim[, 2], row.names=colnames(se)); -->
+
+<!-- plot.data$ColorBy <- colData(se)[, "names"]; -->
+<!-- plot.data$ColorBy <- as.numeric(as.factor(plot.data$ColorBy)); -->
+
+<!-- # Avoid visual biases from default ordering by shuffling the points -->
+<!-- set.seed(44); -->
+<!-- plot.data <- plot.data[sample(nrow(plot.data)),,drop=FALSE]; -->
+
+<!-- dot.plot <- ggplot() + -->
+<!--     geom_point(aes(x=X, y=Y, color=ColorBy), alpha=1, plot.data, size=1) + -->
+<!--     labs(x="Dimension 1", y="Dimension 2", color="names", title="mds") + -->
+<!--     coord_cartesian(xlim=range(plot.data$X, na.rm=TRUE), -->
+<!--         ylim=range(plot.data$Y, na.rm=TRUE), expand=TRUE) + -->
+<!--     scale_color_gradientn(colors=colDataColorMap(colormap, "names", discrete=FALSE)(21), na.value='grey50', limits=range(plot.data$ColorBy, na.rm=TRUE)) + -->
+<!--     theme_bw() + -->
+<!--     theme(legend.position='bottom', legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11), -->
+<!--             axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)) -->
+
+<!-- # Saving data for transmission -->
+<!-- all_contents[['ReducedDimensionPlot1']] <- plot.data -->
+
+
+<!-- knitr::knit_exit('') -->
+<!-- ``` -->
+
+```{r}
+rm(tmp3)
+```
+
+<!-- ```{r, cache = FALSE} -->
+<!-- knitr::knit_exit() -->
+<!-- ``` -->
+
+## Villani's wildtypes (no mutants) and Abud's data {.tabset .tabset-pills}
+
+```{r}
+ambra_wts <- meta[meta$treatment == 'iPSC_MG', 'names']
+```
+
+
+<!-- ```{r, fig.width = 25, fig.height = 25} -->
+
+<!-- ## dim(cbind(logcpms[dict$armor,], abudlcpm[dict$recount,])) -->
+
+<!-- corrplot(cor(cbind(logcpms[dict$armor, ambra_wts], -->
+<!--                    abudlcpm[dict$recount,]), method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white') -->
+<!-- ``` -->
+
+### MDS before batch correction {.tabset .tabset-pills}
+
+```{r fids, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,ambra_wts],
+                            abudlcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+for (item in c('treatment', 'age', 'names', 'origin')) {
+    cat('#### ', item, '\n\n')
+    
+    print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
+          geom_point(size=3) +
+         labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+              y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+              title= paste("MDS before ComBat")) +
+          coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                          ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+          theme_bw() +
+          labs(color = item) +
+          theme(aspect.ratio=1) +
+          theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+    cat('\n\n')
+}
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# parametric adjustment; explore the parametric too
+combat_abud <- sva::ComBat(dat=cbind(logcpms[dict$armor,ambra_wts],
+                                    abudlcpm[dict$recount,]),
+                          batch = c(rep('ambra', length(ambra_wts)),
+                                       rep('abud', ncol(abudlcpm))),
+                          mod = NULL, par.prior = TRUE, prior.plots = FALSE)
+
+```
+
+### MDS after batch correction {.tabset .tabset-pills}
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_abud, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Abud', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+
+for (item in c('origin', 'treatment', 'names', 'age')) {
+    cat('#### ', item, '\n\n')
+    
+    print(ggplot(mds, aes(x=MDS1, y=MDS2, color = get(item)), alpha=1) +
+          geom_point(size=3) +
+         labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+              y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+              title= paste("MDS after ComBat")) +
+          coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                          ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+          theme_bw() +
+          theme(aspect.ratio=1) +
+          theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+    cat('\n\n')
+}
+```
+
+#### Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = age), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
+
+
+
+
+## Villani's wildtypes and mutants and McQuade TREM data {.tabset .tabset-pills}
+
+<!-- ```{r} -->
+
+<!-- srp <- 'SRP281230' -->
+
+<!-- trem <- recount3::create_rse_manual( -->
+<!--                     project = srp, -->
+<!--                     project_home = "data_sources/sra", -->
+<!--                     organism = "human", -->
+<!--                     annotation = "gencode_v29", -->
+<!--                     type = "gene") -->
+
+<!-- trem <- subset(trem, -->
+<!--                select = colData(trem)$external_id %in%  meta$names) -->
+
+<!-- assay(trem, "counts") <- transform_counts(trem) -->
+
+
+<!-- ``` -->
+
+
+```{r}
+trem <- readRDS('/home/imallona/avillani_microglia/mcquade_trem_only_output/outputR/shiny_sce.rds')$sce_gene
+
+trem <- subset(trem,
+               select = colData(trem)$names %in%  meta$names)
+
+tremlcpm <- assay(trem, "logcpm")
+
+```
+
+
+
+
+<!-- ### Correlations -->
+
+<!-- ```{r, fig.width = 25, fig.height = 25} -->
+
+
+<!-- corrplot(cor(cbind(logcpms[dict$armor,], -->
+<!--                    tremlcpm[dict$armor,]), method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white') -->
+<!-- ``` -->
+
+
+### MDS before batch correction
+
+
+
+
+
+```{r, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
+                           tremlcpm[dict$armor,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'McQuade TREM', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# parametric adjustment
+combat_trem <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
+                                    tremlcpm[dict$armor,]),
+                           batch = c(rep('ambra', ncol(logcpms)),
+                                     rep('trem', ncol(tremlcpm))),
+                          mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+### MDS after batch correction {.tabset .tabset-pills}
+
+#### Batch
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_trem, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+# mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Trem', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+#### Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%",vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
+
+
+
+## Villani's wildtypes and mutants and McQuade's iPSCs data {.tabset .tabset-pills}
+
+```{r, message = FALSE, warning = FALSE}
+srp <- 'SRP155574'
+
+mc <- recount3::create_rse_manual(
+                    project = srp,
+                    project_home = "data_sources/sra",
+                    organism = "human",
+                    annotation = "gencode_v29",
+                    type = "gene")
+
+assay(mc, "counts") <- transform_counts(mc)
+
+```
+
+```{r}
+mc <- subset(mc,
+               select = colData(mc)$external_id %in%  meta$names)
+
+assay(mc, "counts") <- transform_counts(mc)
+```
+
+
+
+
+```{r}
+mclcpm <- edgeR::cpm(assay(mc, 'counts'),
+                       log = TRUE, 
+                       prior.count = 2)
+
+
+```
+
+```{r}
+## table(rowData(d)$gene_id %in% rowData(mc)$gene_id)
+
+rowData(d)$unversioned_gene_id <- sapply(strsplit(rowData(d)$gene_id, '\\.'), function(x) return(x[[1]]))
+rowData(mc)$unversioned_gene_id <- sapply(strsplit(rowData(mc)$gene_id, '\\.'), function(x) return(x[[1]]))
+
+## table(rowData(d)$unversioned_gene_id %in% rowData(mc)$unversioned_gene_id)
+
+shared <- intersect(rowData(d)$unversioned_gene_id, rowData(mc)$unversioned_gene_id)
+
+dict <- data.frame(unversioned_gene_id = shared,
+                   armor = rownames(rowData(d)[rowData(d)$unversioned_gene_id %in% shared,]))
+
+dict <- merge(dict, rowData(mc)[rowData(mc)$unversioned_gene_id %in% shared, c('unversioned_gene_id', 'gene_id')],
+              by = 'unversioned_gene_id')
+colnames(dict)[3] <- 'recount'
+
+dict <- dict[grep('PAR_Y', dict$recount, invert = TRUE),]
+```
+
+<!-- ### Correlations -->
+
+
+<!-- ```{r, fig.width = 25, fig.height = 25} -->
+
+<!-- ## dim(cbind(logcpms[dict$armor,], mclcpm[dict$recount,])) -->
+
+<!-- corrplot(cor(cbind(logcpms[dict$armor,], -->
+<!--                    mclcpm[dict$recount,]), method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--           number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white') -->
+<!-- ``` -->
+
+### MDS before batch correction
+
+```{r, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(cbind(logcpms[dict$armor,],
+                            mclcpm[dict$recount,]), top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+#mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio = 1) +
+      theme(legend.position='right'))
+
+
+
+```
+
+### Batch correction
+
+
+```{r}
+# nonparametric adjustment
+combat_mc <- sva::ComBat(dat=cbind(logcpms[dict$armor,],
+                                    mclcpm[dict$recount,]),
+                         batch = c(rep('ambra', ncol(logcpms)),
+                                   rep('mc', ncol(mclcpm))),
+                          mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+### MDS after batch correction {.tabset .tabset-pills}
+
+#### Batch
+
+
+```{r, fig.width = 8, fig.height = 5}
+mds <- limma::plotMDS(combat_mc, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+#mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right')) #, legend.box='vertical', legend.text=element_text(size=9), legend.title=element_text(size=11),
+                                        #axis.text=element_text(size=10), axis.title=element_text(size=12), title=element_text(size=12)))
+```
+
+#### Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%",vexp1),
+               y = sprintf("Dim. 2, var. exp. %s%%", vexp2),title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(fill=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1) +
+      scale_color_brewer(palette = "Set3"))
+
+```
+
+
+# Joint embedding of Villani's plus public data, combined {.tabset .tabset-pills}
+
+```{r}
+pre <- cbind(logcpms[dict$armor,],
+             abudlcpm[dict$recount,],
+             tremlcpm[dict$armor,],
+             mclcpm[dict$recount,])
+```
+
+<!-- ## Correlations (all genes) -->
+
+```{r, fig.width = 30, fig.height = 30}
+
+## dim(cbind(logcpms[dict$armor,], mclcpm[dict$recount,]))
+
+cnames <- colnames(pre)
+colnames(pre) <- meta[meta$names == colnames(pre), 'treatment']
+
+## corrplot(cor(pre, method= 'spearman'),
+##          method  =  'circle', type  =  'lower', insig = 'blank',
+##          number.cex  =  0.8, order  =  'hclust', diag = TRUE , addCoef.col = 'white')
+
+
+```
+
+<!-- ## Correlations (top 500 variable genes) -->
+
+
+<!-- ```{r, fig.width = 30, fig.height = 30} -->
+<!-- corrplot(cor(pre[head(order(rowVars(pre), decreasing = TRUE), 500),], method= 'spearman'), -->
+<!--          method  =  'circle', type  =  'lower', insig = 'blank', -->
+<!--          addCoef.col  = 'white', number.cex  =  0.8, order  =  'hclust', diag = TRUE) -->
+
+
+<!-- ``` -->
+
+
+```{r}
+## take the original colnames back
+colnames(pre) <- cnames
+```
+
+## MDS before batch correction {.tabset .tabset-pills}
+
+### Batch
+
+```{r firstmds, fig.width = 8, fig.height = 5}
+
+mds <- limma::plotMDS(pre, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y, var.explained = mds$var.explained)
+}
+
+## mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'public', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 10, fig.height = 4, results = 'asis'}
+
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS before ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio = 1) + 
+      theme(legend.position='right')) 
+
+
+```
+
+
+## Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%",vexp1),
+               y = sprintf("Dim. 2, var. exp. %s%%", vexp2),title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(color=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1))
+
+```
+
+
+## Batch correction
+
+
+```{r}
+
+pre <- pre[,meta$names]
+
+stopifnot(all(colnames(pre) == meta$names))
+
+
+# nonparametric adjustment is as bad
+post <- sva::ComBat(dat=pre,
+                    batch = as.factor(meta$origin),
+                    mod = NULL, par.prior = TRUE, prior.plots = TRUE)
+
+```
+
+## MDS after batch correction {.tabset .tabset-pills}
+
+### Batch
+
+
+```{r, fig.width = 8, fig.height = 5}
+rm(mds)
+mds <- limma::plotMDS(post, top = 500, labels = NULL, pch = NULL,
+                      cex = 1, dim.plot = c(1, 2), ndim = 7,
+                      gene.selection = "common",
+                      xlab = NULL, ylab = NULL, plot = FALSE, var.explained = TRUE)
+
+vexp1 <- round(mds$var.explained[1]*100)
+vexp2 <- round(mds$var.explained[2]*100)
+
+if (!is.null(mds$cmdscale.out)) {
+    ## Bioc 3.12 and earlier
+    mds <- mds$cmdscale.out
+    colnames(mds) <- paste0("MDS", seq_len(ncol(mds)))
+    mds <- as.data.frame(mds) %>% tibble::rownames_to_column(var = "names")
+} else {
+    mds <- data.frame(names = rownames(mds$distance.matrix.squared),
+                      MDS1 = mds$x,
+                      MDS2 = mds$y)
+}
+
+# mds$origin <- ifelse(grepl('SRR', mds$names), yes = 'Mc', no = 'Ambra')
+
+## mds <- na.omit( mds %>% dplyr::full_join(data.frame(meta), by = "names"))
+
+
+mds <- merge(mds, meta, by = 'names')
+rownames(mds) <- mds$names
+```
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=0.5) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+          y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+          title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(aspect.ratio=1) +
+      theme(legend.position='right'))
+```
+
+### Annotation
+
+```{r, fig.width = 8, fig.height = 4, results = 'asis'}
+print(ggplot(mds, aes(x=MDS1, y=MDS2, color = treatment, shape = origin), alpha=0.5) +
+      geom_point(size=3) +
+     labs(x = sprintf("Dim. 1, var. exp. %s%%",vexp1),
+               y = sprintf("Dim. 2, var. exp. %s%%", vexp2),title= paste("MDS after ComBat")) +
+      coord_cartesian(xlim=range(mds$MDS1, na.rm=TRUE),
+                      ylim=range(mds$MDS2, na.rm=TRUE), expand=TRUE) +
+      theme_bw() +
+      theme(legend.position='right') +
+      guides(color=guide_legend(ncol=2)) +
+      theme(aspect.ratio=1))
+
+```
+
+
+```{r}
+
+pre_counts <- cbind(assay(d, 'counts')[dict$armor,],
+                    assay(abud, 'counts')[dict$recount,],
+                    assay(trem, 'counts')[dict$armor,],
+                    assay(mc, 'counts')[dict$recount,])
+
+pre_counts <- pre_counts[,colnames(pre)]
+
+pre_cpms <- edgeR::cpm(pre_counts,
+                       log = FALSE, 
+                       prior.count = 2)
+
+rownames(mds) <- mds[,1]
+
+mds <- mds[colnames(pre_counts),]
+
+saveRDS(object = SingleCellExperiment(list(logcpms = pre,
+                                           counts = pre_counts,
+                                           cpms = pre_cpms),
+                     colData = data.frame(meta, row.names  = meta$names),
+                     rowData = rowData(d)[dict$armor,],
+                     metadata = list(study = "Villani, Abud, McQuade"),
+                     reducedDims = list(mds = data.frame(mds[,2:3], row.names = mds[,1]))),
+        file = 'all_data_sce.rds')
+```
+
+
+
+
+# Differential expression: mutants vs WTs (regardless of the WTs age)
+
+Original ARMOR run, duplicated here to consolidate outputs.
+
+Here, we perform differential gene expression analysis with edgeR 
+[@Robinson2010edgeR] followed by gene set analysis with camera [@Wu2012camera],
+based on abundance estimates from Salmon. For more detailed information of each
+step, please refer to the 
+[edgeR user guide](https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf).
+
+
+
+```{r edgeR-print-se}
+## List of SummarizedExperiment objects (gene/transcript level)
+se <- readRDS('/home/imallona/avillani_microglia/ambra_only_output/outputR/tximeta_se.rds')
+
+## Get gene-level SummarizedExperiment object
+sg <- se$sg
+metadata <- colData(sg)
+
+sg
+```
+
+## Plot total number of reads per sample
+
+```{r edgeR-plot-totalcount}
+ggplot(data.frame(totCount = colSums(assay(sg, "counts")), 
+                  sample = colnames(assay(sg, "counts")), 
+                  stringsAsFactors = FALSE), 
+       aes(x = sample, y = totCount)) + geom_bar(stat = "identity") + 
+    theme_bw() + xlab("") + ylab("Total read count") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+## Create DGEList and include average transcript length offsets
+
+A `DGEList` is the main object `edgeR` requires to perform the DGE analysis. It
+is designed to store read counts and associated information. After creating this
+object, we add offsets, which are average transcript length correction terms 
+[@Soneson2016tximport],
+and scale them so they are consistent with library sizes (sequencing depth for
+each sample).
+
+Then we calculate normalization factors to scale the raw library sizes and
+minimize the log-fold changes between the samples for most genes. Here the
+trimmed mean of M-values between each pair of samples (TMM) is used by default
+[@Robinson2010TMM].
+
+Finally we add gene annotation information.
+
+```{r edgeR-dge-generate}
+dge0 <- tximeta::makeDGEList(sg)
+
+dge0$genes <- as.data.frame(rowRanges(sg))
+```
+
+## Calculate logCPMs and add as an assay
+
+We calculate log-counts per million (CPMs) because they are useful descriptive
+measures for the expression level of a gene. Note, however, that the normalized
+values are not used for the differential expression analysis. By default, the
+normalized library sizes are used in the computation.
+
+We add the logCPMs to one of the fields (or assay) of the first gene-level
+`SummarizedExperiment` object `sg`. At the end of the analysis, we will use this
+object again to export the results of all the genes we started with.
+
+```{r edgeR-add-logcpm}
+logcpms <- edgeR::cpm(dge0, offset = dge0$offset, log = TRUE, 
+                      prior.count = 2)
+dimnames(logcpms) <- dimnames(dge0$counts)
+
+stopifnot(all(rownames(logcpms) == rownames(sg)),
+          all(colnames(logcpms) == colnames(sg)))
+assay(sg, "logcpm") <- logcpms
+```
+
+Next, we specify the design matrix of the experiment, defining which sample 
+annotations will be taken into account in the statistical modeling.
+
+```{r edgeR-define-design}
+
+design <- '~ 0 + treatment'
+metadata <- read.table('/home/imallona/avillani_microglia/ARMOR/metadata_ambra_only.tsv', header = TRUE)
+stopifnot(all(colnames(dge0) == metadata$names))
+
+
+des <- model.matrix(as.formula(design), data = metadata)
+```
+
+## Filter out lowly expressed genes
+
+Next we determine which genes have sufficiently large counts to be retained in
+the statistical analysis, and remove the rest. After removing genes, we 
+recalculate the normalization factors.
+
+```{r edgeR-filter-genes}
+dim(dge0)
+keep <- edgeR::filterByExpr(dge0, design = des)
+dge <- dge0[keep, ]
+dim(dge)
+```
+
+## Estimate dispersion and fit QL model
+
+We model the count data using a quasi-likelihood (QL) negative binomial (NB)
+generalized log-linear model, which accounts for gene-specific variability from
+both biological and technical sources. Before fitting the model, we estimate
+the NB dispersion (overall biological variability across all genes), and the QL
+dispersion (gene-specific) using the `estimateDisp()` function.
+
+It is also good practice to look at the relationship between the biological
+coefficient of variation (NB dispersion) and the gene abundance (in logCPMs).
+
+```{r edgeR-estimate-disp}
+## Estimate dispersion and fit model
+dge <- estimateDisp(dge, design = des)
+qlfit <- glmQLFit(dge, design = des)
+
+## Plot dispersions
+plotBCV(dge)
+```
+
+## Define contrasts 
+
+Before testing for differences in gene expression, we define the contrasts
+we wish to test for. Here we represent the constrasts as a numeric matrix:
+
+```{r edgeR-define-contrasts}
+contrast <- c('treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG',
+              'treatmentiPSC_MG_TREM2_mut-treatmentiPSC_MG',
+              'treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG_TREM2_mut',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_TREM2_mut',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_Slc37a2_mut1')
+
+
+(contrasts <- as.data.frame(makeContrasts(contrasts = contrast, levels = des)))
+```
+
+
+```{r edgeR-perform-tests}
+signif3 <- function(x) signif(x, digits = 3)
+edgeR_res <- lapply(contrasts, function(cm) {
+    qlf <- glmQLFTest(qlfit, contrast = cm)
+    tt <- topTags(qlf, n = Inf, sort.by = "none")$table
+    tt %>%
+        dplyr::mutate(mlog10PValue = -log10(PValue)) %>% 
+        dplyr::mutate_at(vars(one_of(c("logFC", "logCPM", "F", 
+                                       "PValue", "FDR", "mlog10PValue"))), 
+                         list(signif3))
+})
+```
+
+## DGE tests and MA plots {.tabset .tabset-pills}
+
+We can visualize the test results by plotting the logCPM (average) vs the logFC,
+and coloring genes with an adjusted p-value below 0.05 (or another specificed
+FDR threshold). A plot is drawn for every contrast.
+
+```{r, results = 'asis'}
+if (is(edgeR_res, "data.frame")) {
+    print(ggplot(edgeR_res, aes(x = logCPM, y = logFC, color = FDR <= 0.05)) + 
+              geom_point() + theme_bw() + 
+              scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")))
+} else {
+    for (nm in names(edgeR_res)) {
+        cat('### ', nm, '\n\n')
+        print(ggplot(edgeR_res[[nm]], aes(x = logCPM, y = logFC, color = FDR <= 0.05)) + 
+                  geom_point() + theme_bw() + 
+                  scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")) + 
+              ggtitle(nm))
+        cat('\n\n')
+    }
+}
+```
+
+## Explore DGE results {.tabset .tabset-pills}
+
+We export the results into text files that can be opened using any text editor.
+
+The volcanoes plot the uncorrected p-values, but the coloring (significance) is based on FDR-adjusted p-values.
+Independently of the FDRs, genes with an absolute log2 fold-change greater than 0.5 are also reported (coloring and vertical lines will at the negative and positive values of the FC cut-off).
+
+
+```{r edgeR-save-results, results = 'asis', fig.width = 8, fig.height = 8}
+## Write results to text files and make MA plots
+if (is(edgeR_res, "data.frame")) {
+    write.table(edgeR_res %>% dplyr::arrange(PValue) %>%
+                    dplyr::select(-dplyr::any_of("tx_ids")), 
+                file = "edgeR_dge_results.txt", 
+                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+} else {
+    for (nm in names(edgeR_res)) {
+        cat('### ', nm, '\n\n')
+
+        edgeR_res[[nm]]$simple_gene_name <- edgeR_res[[nm]]$gene_name
+        edgeR_res[[nm]]$simple_gene_name[is.na(edgeR_res[[nm]]$simple_gene_name)] <- edgeR_res[[nm]]$gene_id[is.na(edgeR_res[[nm]]$simple_gene_name)]
+                                                                                                                             
+        print(EnhancedVolcano(edgeR_res[[nm]],
+                         lab = edgeR_res[[nm]]$simple_gene_name,
+                         x = 'logFC',
+                         y = 'PValue',
+                         pCutoffCol = 'FDR',
+                         title = 'differential gene expression',
+                         subtitle = nm,
+                         pCutoff = 0.05,
+                         FCcutoff = 0.5,
+                         pointSize = 3.0,
+                         drawConnectors = TRUE,
+                         labSize = 6.0))
+             
+        fn <-  paste0("edgeR_dge_results_", nm, "_all_ages.txt")
+        write.table(edgeR_res[[nm]] %>% dplyr::arrange(PValue) %>%
+                    dplyr::select(-dplyr::any_of("tx_ids")), 
+                    file = fn, 
+                    sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+        cat(sprintf('\n\n<a href="%s">Download results</a>\n\n', fn))
+        
+        ## (DT::datatable(edgeR_res[[nm]], rownames = FALSE, 
+        ##                extensions = 'Buttons',
+        ##                filter = "none",
+        ##                options = list(pageLength = 5, autowidth = TRUE,
+        ##                               dom = 'Blftip',                           
+        ##                               buttons = c('copy', 'csv', 'excel'))))
+        cat('\n\n')
+        ## write.table(edgeR_res[[nm]] %>% dplyr::arrange(PValue) %>%
+        ##                 dplyr::select(-dplyr::any_of("tx_ids")), 
+        ##             file = paste0("edgeR_dge_results_", nm, ".txt"), 
+        ##             sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+    }
+}
+```
+
+<!-- # Output DGE results as list of `SingleCellExperiment` objects -->
+
+<!-- Here, we store the analysis results with the original data. The results are -->
+<!-- appended on the `rowData` of the original gene-level `SummarizedExperiment` -->
+<!-- object `sg`. For genes that were filtered out, `NA` values are used in the -->
+<!-- result columns. The updated `sg` could be fed to the R package `iSEE` to -->
+<!-- perform more exploratory and visual analysis. -->
+
+<!-- ```{r edgeR-se} -->
+<!-- ## add rows (NA) for genes that are filtered out (if any) -->
+<!-- edgeR_resA <- lapply(seq_along(edgeR_res), FUN = function(x) { -->
+    
+<!--     ## All genes -->
+<!--     geneA <- rowData(sg)$gene_id -->
+    
+<!--     ## Genes that are not filtered out -->
+<!--     resX <- edgeR_res[[x]] -->
+<!--     resX <- resX %>%  -->
+<!--         dplyr::select(c("gene_id", "gene_name", "logFC", "logCPM",  -->
+<!--                         "F", "FDR", "PValue", "mlog10PValue"))  -->
+<!--     rownames(resX) <- resX$gene_id -->
+    
+<!--     ## Genes that are filtered out  -->
+<!--     geneO <- setdiff(geneA, resX$gene_id) -->
+    
+<!--     ## results for all genes -->
+<!--     if (length(geneO) > 0) { -->
+<!--         ## create a data frame with values NA as the results of the genes that -->
+<!--         ## are filtered out -->
+<!--         matO <- matrix(NA, nrow = length(geneO), -->
+<!--                        ncol = ncol(resX), -->
+<!--                        dimnames = list(geneO,  -->
+<!--                                        colnames(resX)))  -->
+<!--         resO <- data.frame(matO) -->
+<!--         resO$gene_id <- geneO -->
+<!--         resO$gene_name <- rowData(sg)$gene_name[match(geneO, rowData(sg)$gene_id)] -->
+        
+<!--         ## Combine the result tables  -->
+<!--         resA <- resO %>% -->
+<!--             dplyr::bind_rows(resX) %>% -->
+<!--             dplyr::arrange(match(gene_id, geneA)) %>% -->
+<!--             dplyr::mutate(contrast = names(edgeR_res)[[x]])  -->
+<!--     } else { -->
+<!--         resA <- resX %>% -->
+<!--             dplyr::arrange(match(gene_id, geneA)) %>% -->
+<!--             dplyr::mutate(contrast = names(edgeR_res)[[x]])  -->
+<!--     } -->
+    
+<!--     ## Use gene column as rownames -->
+<!--     rownames(resA) <- paste(resA$gene_id, resA$gene_name, sep = "__") -->
+    
+<!--     ## convert to DataFrame -->
+<!--     resA <- S4Vectors::DataFrame(resA) -->
+<!--     return(resA) -->
+<!-- }) -->
+<!-- names(edgeR_resA) <- names(edgeR_res) -->
+
+<!-- ## Put the result tables in rowData  -->
+<!-- for (i in seq_along(edgeR_resA)) { -->
+<!--     nam <- names(edgeR_resA)[i] -->
+<!--     namI <- paste("edgeR:", nam, sep = "") -->
+<!--     stopifnot(all(rownames(sg) == rownames(edgeR_resA[[i]]))) -->
+<!--     rowData(sg)[[namI]] <- edgeR_resA[[i]]  -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- The output is saved as a list. Compared to the input data `se`, the element `sg` -->
+<!-- is updated and `st` stays the same. -->
+
+<!-- ```{r edgeR-save-se} -->
+<!-- analysis_se <- list(sg = sg, st = se$st) -->
+<!-- saveRDS(analysis_se, file = "edgeR_dge.rds") -->
+<!-- ``` -->
+
+
+<!-- ```{r check-gene_names-column, eval = !is.null(genesets), include = FALSE} -->
+<!-- if(!("gene_name" %in% colnames(rowData(sg)))) { -->
+<!--     genesets <- NULL -->
+<!-- } -->
+<!-- ``` -->
+
+## Geneset analysis  {.tabset .tabset-pills}
+
+
+We will use `camera` to perform an enrichment analysis for a collection of
+gene sets from the [mSigDB](http://software.broadinstitute.org/gsea/msigdb),
+packaged in the `msigdbr` R package. Here, we load the gene set definitions
+and select which ones to include in the analysis. Genesets included:
+
+<!-- - H, hallmark gene sets  -->
+<!-- - C1, positional gene sets (cytobands) -->
+- C2, curated gene sets from online pathway databases, publications in PubMed, and knowledge of domain experts
+<!-- - C3, regulatory target gene sets based on gene target predictions for microRNA seed sequences and predicted transcription factor binding sites -->
+- C5, Gene Ontology
+- C8, cell type signatures
+
+
+
+
+```{r camera-load-genesets, eval = !is.null(genesets), include = !is.null(genesets)}
+## genesets <- 'H,C1,C2,C3,C5,C8'
+genesets <- 'C2,C5,C8'
+genesets <- strsplit(gsub(" ","",genesets), ",")[[1]]
+
+organism <- 'human'
+
+## Retrieve gene sets and combine in a tibble
+m_df <- bind_rows(lapply(genesets,
+                         function(x) msigdbr(species = organism, category = x)))
+```
+
+```{r camera-text2, echo= FALSE, results = 'asis', eval = !is.null(genesets)}
+cat("We consider only gene sets where the
+number of genes shared with the data set is not too small and not too large.
+`camera` is a competitive gene set test that accounts for correlations among
+the genes within a gene set.")
+```
+
+```{r camera-filter-gene-sets, eval = !is.null(genesets), include = !is.null(genesets)}
+minSize <- 3
+maxSize <- 500
+
+## Get index for genes in each gene set in the DGEList
+indexList <- limma::ids2indices(
+    gene.sets = lapply(split(m_df, f = m_df$gs_name), function(w) w$gene_symbol),
+    identifiers = dge$genes$gene_name,
+    remove.empty = TRUE
+)
+
+## Filter out too small or too large gene sets
+gsSizes <- vapply(indexList, length, 0)
+indexList <- indexList[gsSizes >= minSize & gsSizes <= maxSize]
+```
+
+```{r camera-check-indexList-length, eval = !is.null(genesets), include = FALSE}
+## Check if the index list is empty after filtering
+if (length(indexList) == 0){
+  genesets <- NULL
+  empty <- TRUE
+} else {
+  empty <- FALSE
+}
+```
+
+```{r, echo = FALSE, results = 'asis', eval = !is.null(genesets) && empty}
+cat("**NOTE:**
+The index list is empty after filtering and `camera` cannot be run. Either try
+different gene categories, try different filtering parameters or disable the
+gene set analysis in the `config.yaml` file by setting `run_camera: False`.")
+```
+
+
+
+```{r, eval = !is.null(genesets), include = !is.null(genesets)}
+camera_res <- lapply(contrasts, function(cm) {
+    camera(dge, index = indexList, design = des, contrast = cm,
+           inter.gene.cor = NA)
+})
+```
+
+
+
+
+```{r camera-save-results, results = 'asis', eval = !is.null(genesets), include = !is.null(genesets)}
+## Write results to text files
+if (is(camera_res, "data.frame")) {
+    ## write.table(camera_res %>% tibble::rownames_to_column("GeneSet") %>%
+    ##                 dplyr::arrange(PValue),
+    ##             file = "camera_dge_results.txt",
+    ##             sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+} else {
+    for (nm in names(camera_res)) {
+        cat('### ', nm, '\n\n')
+
+        cat('Significantly (before multiple testing correction, pvalue 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$PValue < 0.05))
+        cat('\n\n')
+
+        
+        cat('Significantly (FDR < 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$FDR < 0.05))
+        cat('\n\n')
+        
+        fn <- paste0("camera_dge_results_", nm, "_all_ages.txt")
+        write.table(camera_res[[nm]] %>%
+                        tibble::rownames_to_column("GeneSet") %>%
+                        dplyr::arrange(PValue),
+                    file = fn,
+                    sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+        cat(sprintf('\n\n<a href="%s">Download geneset analysis results</a>\n\n', fn))
+        cat('\n\n')
+        
+    }
+}
+```
+
+
+```{r camera-save-se, eval = !is.null(genesets), include = !is.null(genesets)}
+geneSets <- lapply(indexList, function(i) dge$genes$gene_name[i])
+saveRDS(list(cameraRes = camera_res,
+             geneSets = geneSets), file = "camera_gsa_all_ages.rds")
+```
+
+
+
+# Differential expression: mutants vs 28-days-old WTs 
+
+
+```{r}
+sg <- sg[,colData(sg)$timepoint == 28]
+metadata <- colData(sg)
+```
+
+## Plot total number of reads per sample
+
+```{r fig.width = 4, fig.height = 4}
+ggplot(data.frame(totCount = colSums(assay(sg, "counts")), 
+                  sample = colnames(assay(sg, "counts")), 
+                  stringsAsFactors = FALSE), 
+       aes(x = sample, y = totCount)) + geom_bar(stat = "identity") + 
+    theme_bw() + xlab("") + ylab("Total read count") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+## Create DGEList and include average transcript length offsets
+
+A `DGEList` is the main object `edgeR` requires to perform the DGE analysis. It
+is designed to store read counts and associated information. After creating this
+object, we add offsets, which are average transcript length correction terms 
+[@Soneson2016tximport],
+and scale them so they are consistent with library sizes (sequencing depth for
+each sample).
+
+Then we calculate normalization factors to scale the raw library sizes and
+minimize the log-fold changes between the samples for most genes. Here the
+trimmed mean of M-values between each pair of samples (TMM) is used by default
+[@Robinson2010TMM].
+
+Finally we add gene annotation information.
+
+```{r}
+dge0 <- tximeta::makeDGEList(sg)
+
+dge0$genes <- as.data.frame(rowRanges(sg))
+```
+
+## Calculate logCPMs and add as an assay
+
+We calculate log-counts per million (CPMs) because they are useful descriptive
+measures for the expression level of a gene. Note, however, that the normalized
+values are not used for the differential expression analysis. By default, the
+normalized library sizes are used in the computation.
+
+We add the logCPMs to one of the fields (or assay) of the first gene-level
+`SummarizedExperiment` object `sg`. At the end of the analysis, we will use this
+object again to export the results of all the genes we started with.
+
+```{r}
+logcpms <- edgeR::cpm(dge0, offset = dge0$offset, log = TRUE, 
+                      prior.count = 2)
+dimnames(logcpms) <- dimnames(dge0$counts)
+
+stopifnot(all(rownames(logcpms) == rownames(sg)),
+          all(colnames(logcpms) == colnames(sg)))
+assay(sg, "logcpm") <- logcpms
+```
+
+Next, we specify the design matrix of the experiment, defining which sample 
+annotations will be taken into account in the statistical modeling.
+
+```{r}
+
+design <- '~ 0 + treatment'
+## metadata <- read.table('/home/imallona/avillani_microglia/ARMOR/metadata_ambra_only.tsv', header = TRUE)
+stopifnot(all(colnames(dge0) == metadata$names))
+
+
+des <- model.matrix(as.formula(design), data = metadata)
+```
+
+## Filter out lowly expressed genes
+
+Next we determine which genes have sufficiently large counts to be retained in
+the statistical analysis, and remove the rest. After removing genes, we 
+recalculate the normalization factors.
+
+```{r}
+dim(dge0)
+keep <- edgeR::filterByExpr(dge0, design = des)
+dge <- dge0[keep, ]
+dim(dge)
+```
+
+## Estimate dispersion and fit QL model
+
+We model the count data using a quasi-likelihood (QL) negative binomial (NB)
+generalized log-linear model, which accounts for gene-specific variability from
+both biological and technical sources. Before fitting the model, we estimate
+the NB dispersion (overall biological variability across all genes), and the QL
+dispersion (gene-specific) using the `estimateDisp()` function.
+
+It is also good practice to look at the relationship between the biological
+coefficient of variation (NB dispersion) and the gene abundance (in logCPMs).
+
+```{r}
+## Estimate dispersion and fit model
+dge <- estimateDisp(dge, design = des)
+qlfit <- glmQLFit(dge, design = des)
+
+## Plot dispersions
+plotBCV(dge)
+```
+
+## Define contrasts 
+
+Before testing for differences in gene expression, we define the contrasts
+we wish to test for. Here we represent the constrasts as a numeric matrix:
+
+```{r}
+contrast <- c('treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG',
+              'treatmentiPSC_MG_TREM2_mut-treatmentiPSC_MG',
+              'treatmentiPSC_MG_Slc37a2_mut1-treatmentiPSC_MG_TREM2_mut',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_TREM2_mut',
+              'treatmentiPSC_MG_Slc37a2_mut2-treatmentiPSC_MG_Slc37a2_mut1')
+
+
+(contrasts <- as.data.frame(makeContrasts(contrasts = contrast, levels = des)))
+```
+
+
+```{r}
+signif3 <- function(x) signif(x, digits = 3)
+edgeR_res <- lapply(contrasts, function(cm) {
+    qlf <- glmQLFTest(qlfit, contrast = cm)
+    tt <- topTags(qlf, n = Inf, sort.by = "none")$table
+    tt %>%
+        dplyr::mutate(mlog10PValue = -log10(PValue)) %>% 
+        dplyr::mutate_at(vars(one_of(c("logFC", "logCPM", "F", 
+                                       "PValue", "FDR", "mlog10PValue"))), 
+                         list(signif3))
+})
+```
+
+## DGE tests and MA plots {.tabset .tabset-pills}
+
+We can visualize the test results by plotting the logCPM (average) vs the logFC,
+and coloring genes with an adjusted p-value below 0.05 (or another specificed
+FDR threshold). A plot is drawn for every contrast.
+
+```{r, results = 'asis'}
+if (is(edgeR_res, "data.frame")) {
+    print(ggplot(edgeR_res, aes(x = logCPM, y = logFC, color = FDR <= 0.05)) + 
+              geom_point() + theme_bw() + 
+              scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")))
+} else {
+    for (nm in names(edgeR_res)) {
+        cat('### ', nm, '\n\n')
+        print(ggplot(edgeR_res[[nm]], aes(x = logCPM, y = logFC, color = FDR <= 0.05)) + 
+                  geom_point() + theme_bw() + 
+                  scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")) + 
+              ggtitle(nm))
+        cat('\n\n')
+    }
+}
+```
+
+## Explore DGE results {.tabset .tabset-pills}
+
+We export the results into text files that can be opened using any text editor.
+
+The volcanoes plot the uncorrected p-values, but the coloring (significance) is based on FDR-adjusted p-values.
+Independently of the FDRs, genes with an absolute log2 fold-change greater than 0.5 are also reported (coloring and vertical lines will at the negative and positive values of the FC cut-off).
+
+
+```{r, results = 'asis',  fig.width = 8, fig.height = 8}
+## Write results to text files and make MA plots
+if (is(edgeR_res, "data.frame")) {
+    write.table(edgeR_res %>% dplyr::arrange(PValue) %>%
+                    dplyr::select(-dplyr::any_of("tx_ids")), 
+                file = "edgeR_dge_results.txt", 
+                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+} else {
+    for (nm in names(edgeR_res)) {
+        cat('### ', nm, '\n\n')
+
+        edgeR_res[[nm]]$simple_gene_name <- edgeR_res[[nm]]$gene_name
+        edgeR_res[[nm]]$simple_gene_name[is.na(edgeR_res[[nm]]$simple_gene_name)] <- edgeR_res[[nm]]$gene_id[is.na(edgeR_res[[nm]]$simple_gene_name)]
+                                                                                                                             
+        print(EnhancedVolcano(edgeR_res[[nm]],
+                         lab = edgeR_res[[nm]]$simple_gene_name,
+                         x = 'logFC',
+                         y = 'PValue',
+                         pCutoffCol = 'FDR',
+                         title = 'differential gene expression',
+                         subtitle = nm,
+                         pCutoff = 0.05,
+                         FCcutoff = 0.5,
+                         drawConnectors = TRUE,
+                         pointSize = 3.0,
+                         labSize = 6.0))
+             
+        fn <-  paste0("edgeR_dge_results_", nm, "_28_days_only.txt")
+        write.table(edgeR_res[[nm]] %>% dplyr::arrange(PValue) %>%
+                    dplyr::select(-dplyr::any_of("tx_ids")), 
+                    file = fn, 
+                    sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+        cat(sprintf('\n\n<a href="%s">Download results</a>\n\n', fn))
+        
+        ## (DT::datatable(edgeR_res[[nm]], rownames = FALSE, 
+        ##                extensions = 'Buttons',
+        ##                filter = "none",
+        ##                options = list(pageLength = 5, autowidth = TRUE,
+        ##                               dom = 'Blftip',                           
+        ##                               buttons = c('copy', 'csv', 'excel'))))
+        cat('\n\n')
+        ## write.table(edgeR_res[[nm]] %>% dplyr::arrange(PValue) %>%
+        ##                 dplyr::select(-dplyr::any_of("tx_ids")), 
+        ##             file = paste0("edgeR_dge_results_", nm, ".txt"), 
+        ##             sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+    }
+}
+```
+
+<!-- # Output DGE results as list of `SingleCellExperiment` objects -->
+
+<!-- Here, we store the analysis results with the original data. The results are -->
+<!-- appended on the `rowData` of the original gene-level `SummarizedExperiment` -->
+<!-- object `sg`. For genes that were filtered out, `NA` values are used in the -->
+<!-- result columns. The updated `sg` could be fed to the R package `iSEE` to -->
+<!-- perform more exploratory and visual analysis. -->
+
+<!-- ```{r edgeR-se} -->
+<!-- ## add rows (NA) for genes that are filtered out (if any) -->
+<!-- edgeR_resA <- lapply(seq_along(edgeR_res), FUN = function(x) { -->
+    
+<!--     ## All genes -->
+<!--     geneA <- rowData(sg)$gene_id -->
+    
+<!--     ## Genes that are not filtered out -->
+<!--     resX <- edgeR_res[[x]] -->
+<!--     resX <- resX %>%  -->
+<!--         dplyr::select(c("gene_id", "gene_name", "logFC", "logCPM",  -->
+<!--                         "F", "FDR", "PValue", "mlog10PValue"))  -->
+<!--     rownames(resX) <- resX$gene_id -->
+    
+<!--     ## Genes that are filtered out  -->
+<!--     geneO <- setdiff(geneA, resX$gene_id) -->
+    
+<!--     ## results for all genes -->
+<!--     if (length(geneO) > 0) { -->
+<!--         ## create a data frame with values NA as the results of the genes that -->
+<!--         ## are filtered out -->
+<!--         matO <- matrix(NA, nrow = length(geneO), -->
+<!--                        ncol = ncol(resX), -->
+<!--                        dimnames = list(geneO,  -->
+<!--                                        colnames(resX)))  -->
+<!--         resO <- data.frame(matO) -->
+<!--         resO$gene_id <- geneO -->
+<!--         resO$gene_name <- rowData(sg)$gene_name[match(geneO, rowData(sg)$gene_id)] -->
+        
+<!--         ## Combine the result tables  -->
+<!--         resA <- resO %>% -->
+<!--             dplyr::bind_rows(resX) %>% -->
+<!--             dplyr::arrange(match(gene_id, geneA)) %>% -->
+<!--             dplyr::mutate(contrast = names(edgeR_res)[[x]])  -->
+<!--     } else { -->
+<!--         resA <- resX %>% -->
+<!--             dplyr::arrange(match(gene_id, geneA)) %>% -->
+<!--             dplyr::mutate(contrast = names(edgeR_res)[[x]])  -->
+<!--     } -->
+    
+<!--     ## Use gene column as rownames -->
+<!--     rownames(resA) <- paste(resA$gene_id, resA$gene_name, sep = "__") -->
+    
+<!--     ## convert to DataFrame -->
+<!--     resA <- S4Vectors::DataFrame(resA) -->
+<!--     return(resA) -->
+<!-- }) -->
+<!-- names(edgeR_resA) <- names(edgeR_res) -->
+
+<!-- ## Put the result tables in rowData  -->
+<!-- for (i in seq_along(edgeR_resA)) { -->
+<!--     nam <- names(edgeR_resA)[i] -->
+<!--     namI <- paste("edgeR:", nam, sep = "") -->
+<!--     stopifnot(all(rownames(sg) == rownames(edgeR_resA[[i]]))) -->
+<!--     rowData(sg)[[namI]] <- edgeR_resA[[i]]  -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- The output is saved as a list. Compared to the input data `se`, the element `sg` -->
+<!-- is updated and `st` stays the same. -->
+
+<!-- ```{r edgeR-save-se} -->
+<!-- analysis_se <- list(sg = sg, st = se$st) -->
+<!-- saveRDS(analysis_se, file = "edgeR_dge.rds") -->
+<!-- ``` -->
+
+
+<!-- ```{r check-gene_names-column, eval = !is.null(genesets), include = FALSE} -->
+<!-- if(!("gene_name" %in% colnames(rowData(sg)))) { -->
+<!--     genesets <- NULL -->
+<!-- } -->
+<!-- ``` -->
+
+
+## Geneset analysis {.tabset .tabset-pills}
+
+
+```{r, eval = !is.null(genesets), include = !is.null(genesets)}
+## genesets <- 'H,C1,C2,C3,C5,C8'
+genesets <- 'C2,C5,C8'
+genesets <- strsplit(gsub(" ","",genesets), ",")[[1]]
+
+organism <- 'human'
+
+## Retrieve gene sets and combine in a tibble
+m_df <- bind_rows(lapply(genesets,
+                         function(x) msigdbr(species = organism, category = x)))
+
+minSize <- 3
+maxSize <- 500
+
+## Get index for genes in each gene set in the DGEList
+indexList <- limma::ids2indices(
+    gene.sets = lapply(split(m_df, f = m_df$gs_name), function(w) w$gene_symbol),
+    identifiers = dge$genes$gene_name,
+    remove.empty = TRUE
+)
+
+## Filter out too small or too large gene sets
+gsSizes <- vapply(indexList, length, 0)
+indexList <- indexList[gsSizes >= minSize & gsSizes <= maxSize]
+```
+
+```{r, eval = !is.null(genesets), include = FALSE}
+## Check if the index list is empty after filtering
+if (length(indexList) == 0){
+  genesets <- NULL
+  empty <- TRUE
+} else {
+  empty <- FALSE
+}
+```
+
+```{r, eval = !is.null(genesets), include = !is.null(genesets)}
+geneSets <- lapply(indexList, function(i) dge$genes$gene_name[i])
+saveRDS(list(cameraRes = camera_res,
+             geneSets = geneSets), file = "camera_gsa_28_days_only.rds")
+```
+
+
+
+```{r camera-perform-tests, cache = FALSE, eval = !is.null(genesets), include = !is.null(genesets)}
+camera_res <- lapply(contrasts, function(cm) {
+    camera(dge, index = indexList, design = des, contrast = cm,
+           inter.gene.cor = NA)
+})
+```
+
+
+
+```{r, results = 'asis', eval = !is.null(genesets), include = !is.null(genesets)}
+## Write results to text files
+if (is(camera_res, "data.frame")) {
+    ## write.table(camera_res %>% tibble::rownames_to_column("GeneSet") %>%
+    ##                 dplyr::arrange(PValue),
+    ##             file = "camera_dge_results.txt",
+    ##             sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+} else {
+    for (nm in names(camera_res)) {
+        cat('### ', nm, '\n\n')
+
+
+        cat('Significantly (before multiple testing correction, pvalue 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$PValue < 0.05))
+        cat('\n\n')
+
+        
+        cat('Significantly (FDR < 0.05) enriched/depleted genesets for this contrast:')        
+        print(sum(camera_res[[nm]]$FDR < 0.05))
+        cat('\n\n')
+        
+        fn <- paste0("camera_dge_results_", nm, "_28_days_only.txt")
+        write.table(camera_res[[nm]] %>%
+                        tibble::rownames_to_column("GeneSet") %>%
+                        dplyr::arrange(PValue),
+                    file = fn,
+                    sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+        cat(sprintf('\n\n<a href="%s">Download geneset analysis results</a>\n\n', fn))
+        cat('\n\n')
+        
+    }
+}
+```
+
+
+# Consistency check
+
+```{r}
+a0 <- readRDS('ambra_villani_only_sce.rds')
+a1 <- readRDS('villani_plus_abud_sce.rds')
+a2 <- readRDS('all_data_sce.rds')
+
+set.seed(54)
+genes <- sample(rownames(a0), 10, replace = FALSE)
+id <- '20220504.B-TREM2-A1_2_R1'
+
+stopifnot(all(assay(a0, 'logcpm')[genes,id] == assay(a1, 'logcpms')[genes,id]) )
+stopifnot(all(assay(a0, 'logcpm')[genes,id] == assay(a2, 'logcpms')[genes,id]) )
+stopifnot(all(assay(a0, 'counts')[genes,id] == assay(a1, 'counts')[genes,id]) )
+stopifnot(all(assay(a0, 'counts')[genes,id] == assay(a2, 'counts')[genes,id]) )
+
+## stopifnot(all(assay(a0, 'cpms')[genes,id] == assay(a1, 'cpms')[genes,id]) )
+## stopifnot(all(assay(a0, 'cpms')[genes,id] == assay(a2, 'cpms')[genes,id]))
+print('passed')
+```
+
+# Plot custom logCPMs
+
+# Timestamp
+
+```{r sessionInfo2, cache = FALSE}
+date()
+sessionInfo()
+## devtools::session_info()
+```
