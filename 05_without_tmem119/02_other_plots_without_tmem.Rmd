@@ -1,5 +1,5 @@
 ---
-title: "Ambra Villani's microglia RNA-seq, custom plots on 11th Apr 2025"
+title: "Ambra Villani's microglia RNA-seq, custom plots"
 author: "Izaskun Mallona, Mark D. Robinson's lab, UZH"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:

@@ -15,7 +15,10 @@ params:
   seed: 665
 ---
 
-this adapts 03_custom/01_custom_analysis_postmeeting.Rmd to get a sample-to-sample (Spearman_ correlation plot of Villani vs Abud, including mutants, after combat correction, and on all genes (not only pluripotecy ones)
+This adapts 03_custom/01_custom_analysis_postmeeting.Rmd to get a sample-to-sample (Spearman_ correlation plot of Villani vs Abud, including mutants, after combat correction, and on all genes (not only pluripotecy ones), to showcase iMGLs vs IPSCs transcriptomic closeness
+
+
+## Diagnosis
 
 ```{r warning = FALSE, message = FALSE}
 ## .libPaths('/home/imallona/R/R4_bioc314')
@@ -29,6 +32,8 @@ library(ComplexHeatmap)
 library(dplyr)
 library(sva)
 library(limma)
+library(ggrepel)
+
 ```
 
 ```{r}
@@ -90,7 +95,6 @@ Repeat from scratch
 ```{r}
 
 logcpms <- assay(tmp3, "logcpms")
-table(tmp3$origin)
 # parametric adjustment
 combat_abud <- sva::ComBat(dat=logcpms,
                            batch = tmp3$origin,
@@ -145,6 +149,37 @@ print(ggplot(mds, aes(x=MDS1, y=MDS2, color = origin), alpha=1) +
 ```
 
 
+Let's name the items to understand the reqs
+
+```{r, fig.width = 10, fig.height = 10}
+rownames(mds) -> mds$id
+
+
+ggplot(mds, aes(x = MDS1, y = MDS2, color = treatment)) +
+  geom_point(size = 3) +
+  geom_text_repel(aes(label = treatment), size = 3, max.overlaps = Inf) +
+  labs(
+    x = sprintf("Dim. 1, var. exp. %s%%", vexp1),
+    y = sprintf("Dim. 2, var. exp. %s%%", vexp2),
+    title = "MDS after ComBat"
+  ) +
+  coord_cartesian(
+    xlim = range(mds$MDS1, na.rm = TRUE),
+    ylim = range(mds$MDS2, na.rm = TRUE),
+    expand = TRUE
+  ) +
+  theme_bw() +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "right"
+  )
+
+```
+
+So the correlations we're are interested in are:
+- upperleftcorner: the iPSC_(Abud)
+- middleleft: the iPSC_MG_(Abud)
+- middleright: iPSC_MG_(Villani)
 
 ```{r}
 ## library(SingleCellExperiment)
@@ -157,16 +192,12 @@ dim(cor_mat)
 
 meta <- as.data.frame(colData(tmp3))
 
-meta$targets <- meta$treatment %in% c('iPSC_MG')
-table(meta$targets)
 ## ann_col <- HeatmapAnnotation( df = meta %>% select(treatment) )
 ann_col <- HeatmapAnnotation(
   df = meta %>% select(treatment, origin, age)
 )
 
 ## ann_row <- rowAnnotation( df = meta %>% select(origin) )
-
-
 ```
 
 ```{r, fig.width = 12, fig.height = 10}
@@ -199,6 +230,125 @@ Heatmap(
   rect_gp = gpar(col = "grey90", lwd = 0.5),
   heatmap_legend_param = list(title = "Correlation")
 )
+
+```
+
+But the actual targets are:
+
+- upperleftcorner: the iPSC_(Abud)
+- middleleft: the iPSC_MG_(Abud)
+- middleright: iPSC_MG_(Villani)
+
+As stated by:
+
+```
+This indeed makes a lot of sense and would be an excellent way to address this point. Are you suggesting comparing not only Villani and Abud iMGLs, but also Villani iMGLs with iPSCs?
+```
+
+
+```{r, fig.width = 12, fig.height = 10}
+cd <- colData(tmp3)
+selected <- rownames(cd[cd$treatment %in% c('iPSC_(Abud)', 'iPSC_MG', 'iPSC_MG_(Abud)'),])
+
+Heatmap(
+  cor_mat[selected,selected],
+  name = "Spearman\ncorrelation",
+  col =  col_fun,
+  cluster_rows = TRUE,
+  cluster_columns = TRUE,
+  show_row_dend = TRUE,
+  show_column_dend = TRUE,
+  top_annotation = ann_col[selected,],
+  ## left_annotation = ann_row,
+  ## cell_fun = cor_text_fun,
+  rect_gp = gpar(col = "grey90", lwd = 0.5),
+  heatmap_legend_param = list(title = "Correlation")
+)
+
+```
+
+```{r, fig.width = 6, fig.height = 3.4}
+cd <- as.data.frame(colData(tmp3))
+selected <- rownames(cd[cd$treatment %in% c("iPSC_(Abud)", "iPSC_MG", "iPSC_MG_(Abud)"), ])
+
+## subset cors and metadata
+sub_cor <- cor_mat[selected, selected]
+sub_meta <- droplevels(cd[selected, ])
+
+cor_long <- data.frame(
+  sample1 = rep(rownames(sub_cor), times = ncol(sub_cor)),
+  sample2 = rep(colnames(sub_cor), each = nrow(sub_cor)),
+  cor     = as.vector(sub_cor),
+  stringsAsFactors = FALSE
+)
+
+# unique pairs only (i < j)
+cor_long <- cor_long[cor_long$sample1 < cor_long$sample2, ]
+
+cor_long$treatment1 <- sub_meta[cor_long$sample1, "treatment"]
+cor_long$treatment2 <- sub_meta[cor_long$sample2, "treatment"]
+
+cor_long$pair_group <- ifelse(
+  cor_long$treatment1 == cor_long$treatment2,
+  paste0("within_", cor_long$treatment1),
+  paste(cor_long$treatment1, cor_long$treatment2, sep = " vs ")
+)
+
+(medians <- aggregate(cor ~ pair_group, data = cor_long, median))
+
+## ggplot(cor_long, aes(x = cor, color = pair_group, fill = pair_group)) +
+##   geom_density(alpha = 0.25) +
+##     geom_vline(data = medians, aes(xintercept = cor, color = pair_group),
+##                linetype = "dashed", linewidth = 0.7) +
+##   theme_bw() +
+##   labs(
+##     title = "Pairwise transcriptome similarity",
+##     x = "Spearman's correlation coefficient",
+##     y = "Density"
+##   )
+
+
+
+ggplot(cor_long, aes(x = cor, color = pair_group, fill = pair_group)) +
+  geom_density(alpha = 0.25) +
+
+  geom_vline(
+    data = medians,
+    aes(xintercept = cor, color = pair_group),
+    linetype = "dashed",
+    linewidth = 0.7
+  ) +
+
+  ## geom_text_repel(
+  ##   data = medians,
+  ##   aes(x = cor, y = Inf, label = sprintf("%.2f", cor), color = pair_group),
+  ##   direction = "y",
+  ##   nudge_y = 0.1,
+  ##   segment.color = NA,
+  ##   size = 3,
+  ##   force = 5,
+  ##   max.overlaps = Inf
+  ## ) +
+  geom_label_repel(
+      data = medians,
+      aes(x = cor, y = Inf,
+          label = sprintf("%.2f", cor),
+          fill = pair_group),
+      color = "black",
+      nudge_y = 0.1,
+      direction = "y",
+      segment.color = NA,
+      size = 3,
+      label.size = 0.2, label.r = unit(0.1, "lines")) +
+
+  coord_cartesian(clip = "off") +
+  theme_bw() +
+  labs(
+    title = "Pairwise transcriptome similarity",
+    x = "Spearman's correlation coefficient",
+    y = "Density"
+  )
+
 
 ```
 
