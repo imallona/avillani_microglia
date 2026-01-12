@@ -248,7 +248,13 @@ This indeed makes a lot of sense and would be an excellent way to address this p
 
 ```{r, fig.width = 12, fig.height = 10}
 cd <- colData(tmp3)
+cd <- droplevels(cd)
+## table(cd$treatment, cd$names)
 selected <- rownames(cd[cd$treatment %in% c('iPSC_(Abud)', 'iPSC_MG', 'iPSC_MG_(Abud)'),])
+
+ann_col_subset <- HeatmapAnnotation(
+  df = cd[selected,c('treatment', 'origin', 'age')]
+)
 
 Heatmap(
   cor_mat[selected,selected],
@@ -258,7 +264,7 @@ Heatmap(
   cluster_columns = TRUE,
   show_row_dend = TRUE,
   show_column_dend = TRUE,
-  top_annotation = ann_col[selected,],
+  top_annotation = ann_col_subset,
   ## left_annotation = ann_row,
   ## cell_fun = cor_text_fun,
   rect_gp = gpar(col = "grey90", lwd = 0.5),
