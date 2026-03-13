@@ -2,6 +2,13 @@
 
 Bulk RNA-seq, Ambra Villani's in-house microglia iPSC-derived cultures (and engineered Slc37a2 and TREM2) plus public bulk RNA-seq data.
 
+## Availability
+
+- Raw sequencing  (fastq) and processed data (counts and others): https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE324751
+- Preprint https://www.biorxiv.org/content/10.1101/2025.08.27.672578v2
+- Zenodo snapshot https://zenodo.org/records/18997850
+- Semi-private mirror: https://gitlab.uzh.ch/izaskun.mallona/avillani_microglia
+
 ## Methods
 
 Inhouse RNA-seq and McQuade's TREM (PMID 31088905) raw reads were processed with ARMOR (PMC6643886). Reads were aligned and counted using the human genome GRCh38 assembly and Gencode release 43 annotation with salmon v1.4.0 and with STAR 2.7.7a. We downloaded Abud's and iPSCs data from the Sequence Read Archive (SRA) accessions SRP092075 and SRP155574, respectively, using recount3 (PMID 34844637) and GRCh38 as reference genome and Gencode's annotation. We modelled the salmon-generated inhouse count data with quasi-likelihood (QL) negative binomial generalized log-linear models and ran differential expression analysis with edgeR v3.36.0 using salmon outputs. 
